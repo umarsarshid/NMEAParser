@@ -35,6 +35,12 @@ double NMEAParser::convertToDecimalDegrees(const std::string& nmeaPos, const std
 
 // Helper: Hex Converter
 int NMEAParser::hexToDecimal(const std::string& hex) {
-    // Stub
-    return 0;
+    if (hex.empty()) return 0;
+       // std::stoi converts string to integer. Base 16 handles "A" -> 10, "F" -> 15.
+    try{
+        return std::stoi(hex, nullptr, 16);
+    } catch(const std::exception& e){
+        std::cerr << e.what() << '\n';
+        return 0;// Return 0 on error
+    }
 }
