@@ -11,6 +11,7 @@ void runTest(NMEAParser& parser, std::string name, std::string nmea) {
         std::cout << " -> Result: BLOCKED (Checksum Invalid)" << std::endl;
     }
     std::cout << "------------------------------------------------" << std::endl;
+    
 }
 
 int main() {
