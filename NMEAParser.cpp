@@ -15,7 +15,48 @@ GPSData NMEAParser::parse(const std::string& nmeastring) {
     }
     result.isValid = true;  
     // 2. Tokenize String
-    // 3. Parse Fields
+     // We assume the payload starts at '$' and we split by comma
+    std::vector<std::string> tokens = split(nmeastring, ',');
+    // 3. Check Header ($GPGGA)
+    // Token 0 is "$GPGGA"
+    if (tokens.size() < 1 || tokens[0] != "$GPGGA") {
+        result.isValid = false;
+        return result; // We only support GPGGA for now
+    }
+     // 4. Parse Fields (Map tokens to struct)
+    // GPGGA Format: $GPGGA,Time,Lat,N,Lon,E,Qual,Sats,HDOP,Alt,M...
+    try {
+        result.isValid = true; // Checksum passed, header passed
+
+        // Latitude (Token 2 & 3)
+        if (tokens.size() > 3) {
+            result.latitude = convertToDecimalDegrees(tokens[2], tokens[3]);
+        }
+
+        // Longitude (Token 4 & 5)
+        if (tokens.size() > 5) {
+            result.longitude = convertToDecimalDegrees(tokens[4], tokens[5]);
+        }
+
+        // Fix Quality (Token 6)
+        if (tokens.size() > 6 && !tokens[6].empty()) {
+            result.fixQuality = std::stoi(tokens[6]);
+        }
+
+        // Satellites (Token 7)
+        if (tokens.size() > 7 && !tokens[7].empty()) {
+            result.satellites = std::stoi(tokens[7]);
+        }
+        
+        // Altitude (Token 9) - Token 8 is HDOP
+        if (tokens.size() > 9 && !tokens[9].empty()) {
+            result.altitude = std::stod(tokens[9]);
+        }
+
+    } catch (...) {
+        // If anything goes wrong during conversion (e.g., malformed numbers)
+        result.isValid = false;
+    }
     return result;
 }
 
