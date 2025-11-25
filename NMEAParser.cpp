@@ -69,8 +69,34 @@ std::vector<std::string> NMEAParser::split(const std::string& s, char delimiter)
 
 // Helper: Coordinate Converter
 double NMEAParser::convertToDecimalDegrees(const std::string& nmeaPos, const std::string& direction) {
-    // Stub
-    return 0.0;
+    if (nmeaPos.empty()) return 0.0;
+
+    // 1. Find where the decimal is (e.g., 4807.038 -> index 4)
+    size_t decimalPos = nmeaPos.find('.');
+    
+    // Safety: If no decimal, handle gracefully (though NMEA usually has one)
+    if (decimalPos == std::string::npos || decimalPos < 2) return 0.0;
+
+    // 2. Separate Degrees and Minutes
+    // Minutes start 2 digits before the decimal
+    size_t minutesStart = decimalPos - 2;
+    
+    std::string degStr = nmeaPos.substr(0, minutesStart);
+    std::string minStr = nmeaPos.substr(minutesStart);
+
+    // 3. Convert to numbers
+    double degrees = std::stod(degStr);
+    double minutes = std::stod(minStr);
+
+    // 4. Calculate Decimal Degrees
+    double result = degrees + (minutes / 60.0);
+
+    // 5. Handle Direction (South and West are negative)
+    if (direction == "S" || direction == "W") {
+        result *= -1.0;
+    }
+
+    return result;
 }
 
 // Helper: Hex Converter
