@@ -17,11 +17,15 @@ struct GPSData {
     
     bool isValid = false;       // The critical flag: True only if checksum passes
     
-    // Optional: A helper to print the data easily
+    // New fields for GPRMC
+    double speed = 0.0;     // Speed over ground (knots)
+    double course = 0.0;    // Track angle in degrees True
+    std::string date = "";  // Date string (DDMMYY)
+    std::string type = "";  // "GPGGA" or "GPRMC"
+
     std::string toString() const {
-        return "Fix: " + std::to_string(fixQuality) + 
-               " | Lat: " + std::to_string(latitude) + 
-               " | Lon: " + std::to_string(longitude);
+        return type + " | Lat: " + std::to_string(latitude) + 
+               " | Lon: " + std::to_string(longitude); 
     }
 };
 
