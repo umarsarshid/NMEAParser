@@ -2,26 +2,29 @@
 #include "NMEAParser.h"
 #include <vector> // Required for vector
 
-int main() {
-    // 1. Create the Parser
-    NMEAParser parser;
-
-    std::cout << "=== PHASE 2 TEST BENCH ===" << std::endl;
-
-    // TEST 1: Hex Conversion
-    std::string hexVal = "5A";
-    int decimal = parser.hexToDecimal(hexVal);
-    std::cout << "Hex '5A' -> Decimal: " << decimal << " (Expected: 90)" << std::endl;
-
-    // TEST 2: Splitter
-    std::string data = "Time,Lat,,Lon";
-    std::vector<std::string> tokens = parser.split(data, ',');
-    
-    std::cout << "Split 'Time,Lat,,Lon':" << std::endl;
-    for(size_t i = 0; i < tokens.size(); i++) {
-        std::cout << " [" << i << "]: '" << tokens[i] << "'" << std::endl;
+void runTest(NMEAParser& parser, std::string name, std::string nmea) {
+    std::cout << "Test: " << name << " | Input: " << nmea << std::endl;
+    GPSData data = parser.parse(nmea);
+    if (data.isValid) {
+        std::cout << " -> Result: PASSED (Checksum Valid)" << std::endl;
+    } else {
+        std::cout << " -> Result: BLOCKED (Checksum Invalid)" << std::endl;
     }
-    // Expected: [0]: 'Time', [1]: 'Lat', [2]: '', [3]: 'Lon'
+    std::cout << "------------------------------------------------" << std::endl;
+}
+
+int main() {
+    NMEAParser parser;
+    
+    // 1. Valid String (Checksum 47 is correct for this data)
+    runTest(parser, "Good Data", "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47");
+
+    // 2. Corrupted String (Modified 'N' to 'S' without changing checksum)
+    // The checksum *should* be different, so the parser must reject this.
+    runTest(parser, "Bad Data ", "$GPGGA,123519,4807.038,S,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47");
+
+    // 3. Garbage String
+    runTest(parser, "Garbage  ", "Not NMEA Data");
 
     return 0;
 }
