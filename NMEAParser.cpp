@@ -24,8 +24,8 @@ bool NMEAParser::validateChecksum(const std::string& s) {
 // Helper: String Splitter
 std::vector<std::string> NMEAParser::split(const std::string& s, char delimiter) {
     std::vector<std::string> tokens;
+    std::string token;
     std::istringstream tokenStream(s);
-
     // getline reads from 'tokenStream' into 'token', stopping at 'delimiter'
     while (std::getline(tokenStream, token, delimiter)) {
         tokens.push_back(token);
