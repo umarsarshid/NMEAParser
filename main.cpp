@@ -1,44 +1,45 @@
 #include <iostream>
-#include <vector>
-#include <iomanip> // For std::setprecision
+#include <memory>
 #include "NMEAParser.h"
+#include "NMEASource.h"
 
-int main() {
-    // 1. Create an instance of NMEAParser
+int main(int argc, char* argv[]) {
     NMEAParser parser;
+    std::unique_ptr<INMEASource> source;
 
-    std::cout << "--- GPS NMEA Parser System v1.0 ---\n" << std::endl;
+    std::cout << "Select Source: [1] UDP Network  [2] Serial Port: ";
+    int choice;
+    std::cin >> choice;
 
-    // 2. Create raw string variables (Simulating an incoming data stream)
-    // We include a valid fix, an invalid checksum, and a 'lost fix' scenario.
-    std::vector<std::string> gpsStream = {
-        "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47", // Valid Fix
-        "$GPGGA,123520,4807.040,N,01131.010,E,1,08,0.9,545.4,M,46.9,M,,*00", // Checksum Error
-        "$GPGGA,,,,,,0,,,,,,",                                              // No Satellite Lock
-        "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A"
-    };
-
-    // 3. The Main Loop
-    for (const auto& rawSentence : gpsStream) {
-        std::cout << "[RX] Data Received: " << rawSentence << std::endl;
-
-        // Pass it to parser.parse()
-        GPSData data = parser.parse(rawSentence);
-
-        // 13. Output Display
-        if (data.isValid) {
-            // If yes, print the Latitude and Longitude
-            std::cout << "  -> STATUS: [VALID]" << std::endl;
-            std::cout << std::fixed << std::setprecision(6); // Format to 6 decimal places
-            std::cout << "     Lat: " << data.latitude 
-                      << " | Lon: " << data.longitude 
-                      << " | Alt: " << data.altitude << "m" << std::endl;
-        } else {
-            // If no, print Error
-            std::cout << "  -> STATUS: [INVALID / CHECKSUM ERROR]" << std::endl;
-        }
-        std::cout << "----------------------------------------------------" << std::endl;
+    if (choice == 1) {
+        source = std::make_unique<UDPSource>(10110);
+    } else {
+        std::string port;
+        std::cout << "Enter Serial Device (e.g., /dev/ttyUSB0 or /dev/pts/X): ";
+        std::cin >> port;
+        source = std::make_unique<SerialSource>(port);
     }
 
+    if (!source->open()) return -1;
+
+    std::cout << "--- Waiting for Data (Ctrl+C to quit) ---" << std::endl;
+
+    while (true) {
+        // BLOCKING CALL: Will wait here until data arrives
+        std::string raw = source->readLine(); 
+        
+        // Remove trailing \r if present
+        if (!raw.empty() && raw.back() == '\r') raw.pop_back();
+
+        std::cout << "[RX] " << raw << std::endl;
+
+        GPSData data = parser.parse(raw);
+        
+        if (data.isValid) {
+            std::cout << "   >>> " << data.toString() << std::endl;
+        }
+    }
+
+    source->close();
     return 0;
 }
