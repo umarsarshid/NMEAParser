@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <fcntl.h> 
+#include <termios.h>
 
 // Abstract Base Class for any Data Source
 class INMEASource {
@@ -63,5 +65,64 @@ public:
 
     void close() override {
         ::close(sockfd);
+    }
+};
+
+class SerialSource : public INMEASource {
+    int serial_fd;
+    std::string device;
+    char buffer[1]; // Read 1 byte at a time
+
+public:
+    SerialSource(std::string dev) : device(dev), serial_fd(-1) {}
+
+    bool open() override {
+        // 1. Open the device
+        serial_fd = ::open(device.c_str(), O_RDWR | O_NOCTTY | O_SYNC);
+        if (serial_fd < 0) {
+            std::cerr << "Serial: Error opening " << device << std::endl;
+            return false;
+        }
+
+        // 2. Configure Termios (The Hard Part)
+        struct termios tty;
+        if (tcgetattr(serial_fd, &tty) != 0) return false;
+
+        cfsetospeed(&tty, B4800); // NMEA Standard Speed
+        cfsetispeed(&tty, B4800);
+
+        tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8; // 8-bit chars
+        tty.c_cflag |= (CLOCAL | CREAD); // ignore modem controls, enable reading
+        tty.c_cflag &= ~(PARENB | PARODD); // shut off parity
+        tty.c_cflag &= ~CSTOPB;
+        tty.c_cflag &= ~CRTSCTS; // No hardware flow control
+
+        // Canonical mode (Read line by line, not byte by byte)
+        tty.c_lflag |= ICANON; 
+
+        if (tcsetattr(serial_fd, TCSANOW, &tty) != 0) return false;
+
+        std::cout << "Serial: Connected to " << device << " @ 4800 Baud" << std::endl;
+        return true;
+    }
+
+    std::string readLine() override {
+        std::string sentence;
+        char c;
+        // Simple blocking read loop
+        while(true) {
+            int n = ::read(serial_fd, &c, 1);
+            if (n > 0) {
+                if (c == '\n') break; // End of line
+                sentence += c;
+            } else {
+                break; // Error or disconnect
+            }
+        }
+        return sentence;
+    }
+
+    void close() override {
+        ::close(serial_fd);
     }
 };
