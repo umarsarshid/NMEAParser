@@ -47,7 +47,7 @@ for (char c : payload) {
     calculatedChecksum ^= c; // Bitwise XOR  
 }
 
-## **🚀 Building and Running**
+## **Building and Running**
 
 This project is designed to be compiler-agnostic and relies only on the C++ Standard Library (STL).
 
