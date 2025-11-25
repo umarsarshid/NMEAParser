@@ -6,9 +6,7 @@
 GPSData NMEAParser::parse(const std::string& nmeastring) {
     GPSData result;
     
-    // TODO: Implement Logic
     // 1. Check Valid Checksum
-
     if (!validateChecksum(nmeastring)) {
         result.isValid = false;
         return result; // Early return on invalid data
