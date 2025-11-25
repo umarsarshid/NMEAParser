@@ -117,4 +117,4 @@ This project was developed following a strict Agile workflow with atomic commits
 * **Phase 6:** **Architectural Refactoring** \-\> Migrated to Factory Pattern & Polymorphism.  
 * **Phase 7:** **System Integration** \-\> Implemented Serial and UDP data sources.
 
-Author: \Umar Arshid\
+Author: Umar Arshid
