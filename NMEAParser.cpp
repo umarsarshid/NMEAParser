@@ -8,10 +8,14 @@ GPSData NMEAParser::parse(const std::string& nmeastring) {
     
     // TODO: Implement Logic
     // 1. Check Valid Checksum
+
+    if (!validateChecksum(nmeastring)) {
+        result.isValid = false;
+        return result; // Early return on invalid data
+    }
+    result.isValid = true;  
     // 2. Tokenize String
     // 3. Parse Fields
-    
-    // For Phase 1 testing, we just return an empty object
     return result;
 }
 
