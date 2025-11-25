@@ -38,14 +38,15 @@ public:
     // The Main Public Interface
     // Takes a raw NMEA string, returns a clean GPSData object
     GPSData parse(const std::string& nmeastring);
-    
+
     // STATIC UTILITIES (Shared tools)
+    //static because they don't depend on instance state
     // Verifies if the string is not corrupted
-    bool validateChecksum(const std::string& s);
+    static bool validateChecksum(const std::string& s);
     // Splits the string by commas (like Python's split)
-    std::vector<std::string> split(const std::string& s, char delimiter);
+    static std::vector<std::string> split(const std::string& s, char delimiter);
     // Converts NMEA weird coordinates (DDMM.MMMM) to standard Decimal Degrees
-    double convertToDecimalDegrees(const std::string& nmeaPos, const std::string& direction);
+    static double convertToDecimalDegrees(const std::string& nmeaPos, const std::string& direction);
     // Hex to Int converter for checksum validation
-    int hexToDecimal(const std::string& hex);
+    static int hexToDecimal(const std::string& hex);
 };
