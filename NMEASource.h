@@ -80,7 +80,8 @@ public:
         // 1. Open the device
         serial_fd = ::open(device.c_str(), O_RDWR | O_NOCTTY | O_SYNC);
         if (serial_fd < 0) {
-            std::cerr << "Serial: Error opening " << device << std::endl;
+           // NEW LINE: Print the actual system error
+            perror("Serial Open Error"); 
             return false;
         }
 
