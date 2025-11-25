@@ -35,7 +35,7 @@ public:
     // Takes a raw NMEA string, returns a clean GPSData object
     GPSData parse(const std::string& nmeastring);
 
-// private:
+private:
     // HELPER FUNCTIONS (Internal logic only)
     
     // Verifies if the string is not corrupted
