@@ -1,5 +1,6 @@
 #include "NMEAParser.h"
 #include <cmath> // Will be needed later for math
+#include <sstream> // For stringstream in split 
 
 // Main Parse Function
 GPSData NMEAParser::parse(const std::string& nmeastring) {
@@ -23,7 +24,16 @@ bool NMEAParser::validateChecksum(const std::string& s) {
 // Helper: String Splitter
 std::vector<std::string> NMEAParser::split(const std::string& s, char delimiter) {
     std::vector<std::string> tokens;
-    // Stub
+    std::istringstream tokenStream(s);
+
+    // getline reads from 'tokenStream' into 'token', stopping at 'delimiter'
+    while (std::getline(tokenStream, token, delimiter)) {
+        tokens.push_back(token);
+    }
+    // Edge case: If the string ends with a comma (e.g., "data,"), 
+    // getline might ignore the trailing empty field. 
+    // For NMEA, strictly speaking, we usually just need the data between commas.
+    
     return tokens;
 }
 
