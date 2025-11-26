@@ -46,8 +46,11 @@ public:
         servaddr.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces
         servaddr.sin_port = htons(port);
 
+        // In NMEASource.h / UDPSource::open()
+
         if (bind(sockfd, (const sockaddr*)&servaddr, sizeof(servaddr)) < 0) {
-            std::cerr << "UDP: Bind failed" << std::endl;
+            // NEW LINE: Prints the specific system error
+            perror("UDP Bind Error"); 
             return false;
         }
         std::cout << "UDP: Listening on port " << port << std::endl;
