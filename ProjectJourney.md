@@ -2,7 +2,7 @@
 
 *A development log chronicling the evolution from a simple string parser to a hardware-integrated navigation system.*
 
-## **Chapter 1: Mini Project**
+## **Chapter 1: A Simple Parser**
 
 **The Goal:** Parse a single $GPGGA string from a GPS receiver.  
 When I started, I treated this purely as a **String Manipulation** problem. The focus was simple: "Get data in, get struct out."
@@ -25,7 +25,7 @@ GPSData parse(string s) {
     // What if I want to add $GPRMC? I have to modify this huge function again.  
 }
 
-## **Chapter 2: The Architectural Pivot**
+## **Chapter 2: The Architectural Pivot (Day 6\)**
 
 **The Trigger:** I needed to add $GPRMC (Speed & Course) support.  
 I realized that adding more if/else statements inside the main parser violated the **Open/Closed Principle**. Every time I added a sentence type, I risked breaking the GPGGA logic.
@@ -41,7 +41,7 @@ I refactored the code to use **Polymorphism**.
 The Result:  
 Now, adding support for $GPZDA (Time) or $GPGSV (Satellites) requires zero changes to the existing parser logic. I just create a new file.
 
-## **Chapter 3: Connecting to the Real World**
+## **Chapter 3: Connecting to the Real World (Day 7\)**
 
 **The Trigger:** A parser is useless if it can't read from hardware.  
 Testing with hardcoded strings was fine for logic, but real boats use **Serial Cables (RS-422)** or **UDP WiFi Broadcasts**.
@@ -57,12 +57,28 @@ I didn't want my parser to care where the data came from. I implemented a **Hard
 The "Senior" Moment:  
 I used socat to create virtual serial ports on my Mac (/dev/ttys005 \<-\> /dev/ttys006), allowing me to simulate a physical hardware connection without needing a real GPS puck.
 
+## **Chapter 4: Decoupling the Systems (Day 8\)**
+
+**The Trigger:** My main.cpp was getting messy. It was printing to the console, but I realized a real Chart Plotter needs to update a GUI, log to a database, and steer the autopilot simultaneously.  
+My system was "Pulling" data (asking for updates). Real-time systems need to "Push" data (notify when updates happen).
+
+### **The Solution: The Observer Pattern**
+
+I transformed the Parser into an **Event Emitter**.
+
+1. **Callbacks:** I utilized std::function to define a GPSCallback type.  
+2. **Subscription:** I added an onFix() method, allowing any external system to subscribe to updates.  
+3. **The Event Loop:** The main loop became "dumb." It simply pumps data from the hardware into the parser. The parser then "rings the bell," and the separate Logging and Display systems wake up automatically.
+
+The Result:  
+I achieved Zero Coupling. The GPS Driver doesn't know the Display exists. The Display doesn't know the Logger exists. They all just react to the data.
+
 ## **🏁 Conclusion**
 
 What started as a regex exercise evolved into a robust **Systems Engineering** project.
 
-* **Lines of Code:** \~400  
-* **Architecture:** Factory Pattern & Strategy Pattern  
-* **Key Tech:** C++17, Polymorphism, POSIX Sockets, Termios
+* **Lines of Code:** \~450  
+* **Architecture:** Factory Pattern, Strategy Pattern, & Observer Pattern.  
+* **Key Tech:** C++17, Polymorphism, POSIX Sockets, Termios, std::function.
 
-This project demonstrates not just C++ syntax, but the ability to design scalable software that survives the messy reality of hardware integration.
+This project demonstrates not just C++ syntax, but the ability to design scalable software that survives the messy reality of hardware integration and real-time requirements.
