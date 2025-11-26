@@ -1,7 +1,54 @@
 #include <iostream>
 #include <memory>
+#include <thread>  // <--- NEW
+#include <atomic>  // <--- NEW
 #include "NMEAParser.h"
 #include "NMEASource.h"
+#include "SafeQueue.h" // <--- NEW
+
+// Global atomic flag to control thread shutdown
+std::atomic<bool> running(true);
+
+// ---------------------------------------------------------
+// THREAD A: PRODUCER (Reads Hardware)
+// ---------------------------------------------------------
+void gpsReaderTask(INMEASource* source, SafeQueue<std::string>& queue) {
+    std::cout << "[THREAD-A] Reader started." << std::endl;
+    while (running) {
+        // This blocks until data comes from UDP/Serial
+        std::string line = source->readLine();
+        
+        if (!line.empty()) {
+            std::cout << "[RX] " << line << std::endl;
+            queue.push(line); // Hand off to queue
+        }
+    }
+}
+
+// ---------------------------------------------------------
+// THREAD B: CONSUMER (Parses & Logs)
+// ---------------------------------------------------------
+void dataProcessorTask(NMEAParser* parser, SafeQueue<std::string>& queue) {
+    std::cout << "[THREAD-B] Processor started." << std::endl;
+    std::string rawData;
+    
+    while (running) {
+        // This blocks (sleeps) until the queue has data
+        queue.waitAndPop(rawData);
+
+        // Simulate a slow database write or heavy calculation
+        // 2. SIMULATE SLOW DATABASE
+        // We force this thread to sleep for 500ms (0.5 seconds).
+        // This is ETERNITY for a computer.
+        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        parser->parse(rawData);
+        // 4. VISUAL PROOF
+        // We can't easily check .size() on std::queue without adding a method,
+        // but we can print that we just finished one.
+        std::cout << "   [Slow-Consumer] Processed 1 msg. (Simulated Lag)" << std::endl;
+    }
+}
 
 // System A: The "GUI" (Prints formatted data)
 void displaySystem(const GPSData& data) {
@@ -18,34 +65,41 @@ void loggingSystem(const GPSData& data) {
 int main() {
     NMEAParser parser;
     std::unique_ptr<INMEASource> source;
+    SafeQueue<std::string> buffer;
 
     // 1. Setup Source (Hardcoded to UDP for brevity, or reuse your selection logic)
     std::cout << "Initializing System..." << std::endl;
-    // For testing, let's use Serial or UDP. 
-    // If you don't have socat running, stick to UDP/netcat for easier testing.
-    source = std::make_unique<UDPSource>(10110); 
+    std::cout << "Select Source: [1] UDP Network  [2] Serial Port: ";
+    int choice;
+    std::cin >> choice;
+
+    if (choice == 1) {
+        source = std::make_unique<UDPSource>(10110);
+    } else {
+        std::string port;
+        std::cout << "Enter Serial Device (e.g., /dev/ttyUSB0 or /dev/pts/X): ";
+        std::cin >> port;
+        source = std::make_unique<SerialSource>(port);
+    }
     
     if (!source->open()) return -1;
-
+    std::cout << "--- Waiting for Data (Ctrl+C to quit) ---" << std::endl;
     // 2. Subscribe Systems (The Wiring)
     // We attach two independent systems to the same parser
-    parser.onFix(displaySystem);
-    parser.onFix(loggingSystem);
+    // Attach Observers (Display/Log)
+    parser.onFix([](const GPSData& d){ 
+        std::cout << "[UI] Fix: " << d.latitude << "," << d.longitude << std::endl; 
+    });
 
-    std::cout << "--- System Online: Waiting for Events ---" << std::endl;
+    std::cout << "--- Starting Multi-Threaded Engine ---" << std::endl;
 
-    // 3. The Pump (The "Event Loop")
-    while (true) {
-        std::string raw = source->readLine();
-        
-        // Remove trailing \r
-        if (!raw.empty() && raw.back() == '\r') raw.pop_back();
+    // Launch Threads
+    std::thread producer(gpsReaderTask, source.get(), std::ref(buffer));
+    std::thread consumer(dataProcessorTask, &parser, std::ref(buffer));
 
-        // Note: We ignore the return value now! 
-        // The parser handles the dispatching internally.
-        parser.parse(raw);
-    }
+    // Wait for Threads (Ideally, handle a Ctrl+C signal to set running=false)
+    producer.join();
+    consumer.join();
 
-    source->close();
     return 0;
 }
