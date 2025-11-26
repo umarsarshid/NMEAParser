@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <functional> // <--- Added
 
 // 1. Define the Data Object
 // This struct holds the final, clean data extracted from the messy string.
@@ -31,6 +32,15 @@ struct GPSData {
 
 // 2. Define the Class Interface
 class NMEAParser {
+    // Define the Event Type: A function that returns void and takes const GPSData&
+    using GPSCallback = std::function<void(const GPSData&)>;
+
+    // List of subscribers
+    std::vector<GPSCallback> listeners;
+
+    // Helper to notify them
+    void notifyListeners(const GPSData& data);
+
 public:
     // Constructor
     NMEAParser() = default;
@@ -38,6 +48,10 @@ public:
     // The Main Public Interface
     // Takes a raw NMEA string, returns a clean GPSData object
     GPSData parse(const std::string& nmeastring);
+
+    // NEW: Subscription Method
+    // Users call this to say "Call me when you get a fix"
+    void onFix(GPSCallback cb);
 
     // STATIC UTILITIES (Shared tools)
     //static because they don't depend on instance state
