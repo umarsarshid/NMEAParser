@@ -1,11 +1,11 @@
 # **NMEA-0183 Navigation Data Parser & Integration System**
 
-## ** Executive Summary**
+## **Executive Summary**
 
 This project is a modular, high-performance C++ library designed to ingest, validate, and parse **NMEA-0183** marine navigation data.  
 It represents a complete Embedded Systems software stack, moving beyond simple string parsing to a robust **Event-Driven Architecture**. The system features a **Hardware Abstraction Layer (HAL)** for data ingestion, a **Factory Pattern** for dynamic sentence parsing, and an **Observer Pattern** for decoupling the core driver from consumer systems (such as displays, data loggers, or autopilots).
 
-## ** System Architecture**
+## **System Architecture**
 
 The system is built on four core architectural pillars:
 
@@ -45,7 +45,7 @@ classDiagram
     INMEASentence \<|-- GPGGASentence  
     INMEASentence \<|-- GPRMCSentence
 
-## ** Technical Capabilities**
+## **Technical Capabilities**
 
 ### **1\. Hardware Integration (HAL)**
 
@@ -63,7 +63,7 @@ classDiagram
 * **Coordinate Math:** Converts legacy NMEA DDMM.MMMM (Degrees-Minutes) into standard Decimal Degrees for modern GIS compatibility.  
 * **Safety:** Implements **XOR Checksum Validation** to reject corrupted packets before they enter the processing pipeline.
 
-## ** Building and Running**
+## **Building and Running**
 
 The project utilizes a Makefile for streamlined compilation and build management.
 
@@ -93,7 +93,7 @@ make run
 To remove object files and the executable:  
 make clean
 
-## ** Testing with Hardware Simulation**
+## **Testing with Hardware Simulation**
 
 Since physical GPS hardware is not always available, the system was verified using industry-standard simulation tools.
 
@@ -122,7 +122,7 @@ To simulate a physical serial cable using socat:
 ```bash   
    echo "\\$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W\*6A" \> /dev/ttys006
 ```
-## ** Project Timeline (SDLC Simulation)**
+## **Project Timeline (SDLC Simulation)**
 
 This project was developed following a strict Agile workflow with atomic commits:
 
