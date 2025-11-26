@@ -1,10 +1,12 @@
 #include <iostream>
 #include <memory>
-#include <thread>  // <--- NEW
-#include <atomic>  // <--- NEW
+#include <thread>  
+#include <atomic>  
 #include "NMEAParser.h"
 #include "NMEASource.h"
-#include "SafeQueue.h" // <--- NEW
+#include "SafeQueue.h" 
+#include "SQLiteLogger.h"
+
 
 // Global atomic flag to control thread shutdown
 std::atomic<bool> running(true);
@@ -87,9 +89,22 @@ int main() {
     // 2. Subscribe Systems (The Wiring)
     // We attach two independent systems to the same parser
     // Attach Observers (Display/Log)
-    parser.onFix([](const GPSData& d){ 
+
+    // 1. Setup DB
+    std::cout << "Initializing Database..." << std::endl;
+    SQLiteLogger dbLogger("voyage_data.db");
+
+    // 2. Subscribe the DB to the Parser
+    // We use a Lambda to capture the dbLogger reference
+    parser.onFix([&dbLogger](const GPSData& d) {
+        // Optional: Filter. Only log valid fixes with > 3 satellites?
         std::cout << "[UI] Fix: " << d.latitude << "," << d.longitude << std::endl; 
+        if (d.isValid) {
+            dbLogger.log(d);
+        }
     });
+
+    // ... continue with starting threads ...
 
     std::cout << "--- Starting Multi-Threaded Engine ---" << std::endl;
 
