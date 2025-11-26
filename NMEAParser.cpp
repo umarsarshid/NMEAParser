@@ -17,6 +17,18 @@
     Call parse(). */
 
 
+  // NEW: Subscription Method
+void NMEAParser::onFix(GPSCallback cb) {
+    listeners.push_back(cb);
+}   
+
+// NEW: Notify Listeners
+void NMEAParser::notifyListeners(const GPSData& data) {
+    for (const auto& listener : listeners) {
+        listener(data); // Call each subscribed function
+    }
+}
+
 // Main Parse Function
 GPSData NMEAParser::parse(const std::string& nmeastring) {
     GPSData result;
@@ -47,9 +59,13 @@ GPSData NMEAParser::parse(const std::string& nmeastring) {
     if (parser != nullptr) {
         result.isValid = true;
         parser->parse(tokens, result);
-        delete parser; // Clean up memory!
+        delete parser;
+        
+        // NEW: If valid, notify everyone!
+        if (result.isValid) {
+            notifyListeners(result);
+        }
     } else {
-        // Unknown sentence type
         result.isValid = false;
     }
 
@@ -147,3 +163,8 @@ int NMEAParser::hexToDecimal(const std::string& hex) {
         return 0;// Return 0 on error
     }
 }
+
+
+
+// Note: You would call notifyListeners(data) in parse() when a valid fix is obtained.
+// For example, after parsing and validating data, you might add:
