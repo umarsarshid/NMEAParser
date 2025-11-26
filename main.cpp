@@ -3,41 +3,47 @@
 #include "NMEAParser.h"
 #include "NMEASource.h"
 
-int main(int argc, char* argv[]) {
+// System A: The "GUI" (Prints formatted data)
+void displaySystem(const GPSData& data) {
+    std::cout << "\n[DISPLAY] Fix Acquired!" << std::endl;
+    std::cout << "   Lat: " << data.latitude << " | Lon: " << data.longitude << std::endl;
+}
+
+// System B: The "Data Logger" (Simulates writing to a database)
+void loggingSystem(const GPSData& data) {
+    // In a real app, this might write to a CSV file or SQL DB
+    std::cout << "[LOG] Database updated: " << data.toString() << std::endl;
+}
+
+int main() {
     NMEAParser parser;
     std::unique_ptr<INMEASource> source;
 
-    std::cout << "Select Source: [1] UDP Network  [2] Serial Port: ";
-    int choice;
-    std::cin >> choice;
-
-    if (choice == 1) {
-        source = std::make_unique<UDPSource>(10110);
-    } else {
-        std::string port;
-        std::cout << "Enter Serial Device (e.g., /dev/ttyUSB0 or /dev/pts/X): ";
-        std::cin >> port;
-        source = std::make_unique<SerialSource>(port);
-    }
-
+    // 1. Setup Source (Hardcoded to UDP for brevity, or reuse your selection logic)
+    std::cout << "Initializing System..." << std::endl;
+    // For testing, let's use Serial or UDP. 
+    // If you don't have socat running, stick to UDP/netcat for easier testing.
+    source = std::make_unique<UDPSource>(10110); 
+    
     if (!source->open()) return -1;
 
-    std::cout << "--- Waiting for Data (Ctrl+C to quit) ---" << std::endl;
+    // 2. Subscribe Systems (The Wiring)
+    // We attach two independent systems to the same parser
+    parser.onFix(displaySystem);
+    parser.onFix(loggingSystem);
 
+    std::cout << "--- System Online: Waiting for Events ---" << std::endl;
+
+    // 3. The Pump (The "Event Loop")
     while (true) {
-        // BLOCKING CALL: Will wait here until data arrives
-        std::string raw = source->readLine(); 
+        std::string raw = source->readLine();
         
-        // Remove trailing \r if present
+        // Remove trailing \r
         if (!raw.empty() && raw.back() == '\r') raw.pop_back();
 
-        std::cout << "[RX] " << raw << std::endl;
-
-        GPSData data = parser.parse(raw);
-        
-        if (data.isValid) {
-            std::cout << "   >>> " << data.toString() << std::endl;
-        }
+        // Note: We ignore the return value now! 
+        // The parser handles the dispatching internally.
+        parser.parse(raw);
     }
 
     source->close();
