@@ -9,11 +9,11 @@ LDFLAGS = -pthread -lsqlite3 -lncurses
 TARGET = nmea_engine
 
 # Source Files
-SRCS = main.cpp NMEAParser.cpp SQLiteLogger.cpp
+SRCS = main.cpp NMEAParser.cpp SQLiteLogger.cpp GPSDashboard.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 # Header Dependencies (for rebuilding if headers change)
-HEADERS = NMEAParser.h NMEASentences.h NMEASource.h SQLiteLogger.h SafeQueue.h
+HEADERS = NMEAParser.h NMEASentences.h NMEASource.h SQLiteLogger.h SafeQueue.h GPSDashboard.h
 
 # --- Targets ---
 

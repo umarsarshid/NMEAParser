@@ -6,7 +6,7 @@
 #include "NMEASource.h"
 #include "SafeQueue.h" 
 #include "SQLiteLogger.h"
-
+#include "GPSDashboard.h"
 
 // Global atomic flag to control thread shutdown
 std::atomic<bool> running(true);
@@ -68,6 +68,9 @@ int main() {
     NMEAParser parser;
     std::unique_ptr<INMEASource> source;
     SafeQueue<std::string> buffer;
+
+    //initialize ncurses for the dashboard
+    GPSDashboard dashboard;
 
     // 1. Setup Source (Hardcoded to UDP for brevity, or reuse your selection logic)
     std::cout << "Initializing System..." << std::endl;
