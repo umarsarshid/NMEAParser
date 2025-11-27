@@ -18,20 +18,25 @@ The system is built on seven core architectural pillars:
 7. **The Face (User Interface):** An NCurses-based dashboard that renders live data without console scrolling.
 
 ```mermaid
-flowchart LR  
-    subgraph "Thread A: Hardware (Producer)"  
-    A\[UDP / Serial Port\] \--\>|Raw Bytes| B(INMEASource)  
-    B \--\>|Push| C{SafeQueue\<T\>}  
-    end  
-   
-   subgraph "Thread B: Logic (Consumer)"  
-    C \--\>|Pop| D\[NMEAParser\]  
-    D \--\>|Factory| E\[GPGGA / GPRMC Logic\]  
-    E \--\>|Notify| F\[Observer Callbacks\]  
-    end  
-  
-    F \--\> G\[SQLite Database\]  
-    F \--\> H\[TUI Dashboard\]
+graph LR
+    %% Styles
+    classDef producer fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef consumer fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef storage fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
+
+    subgraph "Thread A: Hardware (Producer)"
+        A[UDP / Serial Port]:::producer -->|Raw Bytes| B(INMEASource):::producer
+        B -->|Push| C{{"SafeQueue&lt;T&gt;"}}:::producer
+    end
+
+    subgraph "Thread B: Logic (Consumer)"
+        C -->|Pop| D[NMEAParser]:::consumer
+        D -->|Factory| E[GPGGA / GPRMC Logic]:::consumer
+        E -->|Notify| F[Observer Callbacks]:::consumer
+    end
+
+    F --> G[("SQLite Database")]:::storage
+    F --> H["TUI Dashboard"]:::storage
 ```
 ## **Technical Capabilities**
 
