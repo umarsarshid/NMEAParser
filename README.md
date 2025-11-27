@@ -2,96 +2,78 @@
 
 ## **Executive Summary**
 
-This project is a modular, high-performance C++ library designed to ingest, validate, and parse **NMEA-0183** marine navigation data.  
-It represents a complete Embedded Systems software stack, moving beyond simple string parsing to a robust **Event-Driven Architecture**. The system features a **Hardware Abstraction Layer (HAL)** for data ingestion, a **Factory Pattern** for dynamic sentence parsing, and an **Observer Pattern** for decoupling the core driver from consumer systems (such as displays, data loggers, or autopilots).
+This project is a modular, fault-tolerant C++ library designed to ingest, validate, parse, persist, and visualize **NMEA-0183** marine navigation data.  
+It represents a complete Embedded Systems software stack. The system has evolved from a simple string parser into a robust **Real-Time Engine** capable of handling high-frequency data bursts (10Hz+) without packet loss. It features a **Hardware Abstraction Layer (HAL)**, a **Producer-Consumer Architecture** for concurrency, an embedded **SQLite Database** for tracking, and a professional **Text User Interface (TUI)** for real-time monitoring.
 
 ## **System Architecture**
 
-The system is built on four core architectural pillars:
+The system is built on seven core architectural pillars:
 
 1. **The Abstraction Layer (INMEASource):** Uses Dependency Injection to treat Serial ports and UDP sockets identically.  
 2. **The Gatekeeper (NMEAParser):** A centralized factory that validates checksums and dispatches logic.  
 3. **The Strategies (INMEASentence):** Polymorphic classes that handle specific sentence logic (GPGGA vs GPRMC).  
-4. **The Event Bus (Observer Pattern):** Allows multiple systems to subscribe to GPS updates via callbacks, enabling a "Push" data model.
+4. **The Event Bus (Observer Pattern):** Allows multiple systems to subscribe to GPS updates via callbacks.  
+5. **The Shock Absorber (Concurrency):** A Thread-Safe Queue separating Ingestion from Processing.  
+6. **The Black Box (Persistence):** An RAII-compliant SQLite wrapper that securely logs voyage data to disk.  
+7. **The Face (User Interface):** An NCurses-based dashboard that renders live data without console scrolling.
 
-```cpp
-classDiagram  
-    class INMEASource {  
-        \<\<interface\>\>  
-        \+readLine() string  
-        \+open() bool  
-    }  
-    class SerialSource  
-    class UDPSource  
-    INMEASource \<|-- SerialSource  
-    INMEASource \<|-- UDPSource  
+graph LR  
+    subgraph "Thread A: Hardware (Producer)"  
+    A\[UDP / Serial Port\] \--\>|Raw Bytes| B(INMEASource)  
+    B \--\>|Push| C{SafeQueue\<T\>}  
+    end  
       
-    class NMEAParser {  
-        \-listeners : vector\<function\>  
-        \+onFix(callback)  
-        \+parse(string)  
-        \-notifyListeners()  
-    }  
+    subgraph "Thread B: Logic (Consumer)"  
+    C \--\>|Pop| D\[NMEAParser\]  
+    D \--\>|Factory| E\[GPGGA / GPRMC Logic\]  
+    E \--\>|Notify| F\[Observer Callbacks\]  
+    end  
       
-    class INMEASentence {  
-        \<\<interface\>\>  
-        \+parse(tokens, data)  
-    }  
-    class GPGGASentence  
-    class GPRMCSentence  
-```      
-    NMEAParser ..\> INMEASentence : Instantiates (Factory)  
-    NMEAParser \--\> "Many" ConsumerSystem : Notifies (Observer)  
-    INMEASentence \<|-- GPGGASentence  
-    INMEASentence \<|-- GPRMCSentence
+    F \--\> G\[SQLite Database\]  
+    F \--\> H\[TUI Dashboard\]
 
 ## **Technical Capabilities**
 
-### **1\. Hardware Integration (HAL)**
+### **1\. High-Performance Concurrency**
 
-* **Serial/UART:** Implements low-level POSIX termios configuration to interface with physical GPS receivers at **4800 Baud (8N1)**. Compatible with Linux (/dev/ttyUSB0) and macOS (/dev/ttysXXX).  
-* **UDP Networking:** Listens on Port **10110** (Standard Marine WiFi protocol) to accept NMEA data broadcast over local networks.
+* **Producer-Consumer Model:** Implements a multi-threaded architecture where **Thread A** handles high-speed IO (Ingestion) and **Thread B** handles CPU-intensive Logic/IO (Processing).  
+* **Backpressure Management:** Verified via stress testing to handle **10Hz** input streams even when downstream consumers lag (simulated 2Hz throughput), ensuring **Zero Packet Loss**.
 
-### **2\. Event-Driven Design**
+### **2\. User Interface (TUI)**
 
-* **Zero-Coupling:** The main driver loop does not know *what* happens to the data. It simply pumps the engine.  
-* **Multi-Subscriber:** Supports multiple simultaneous outputs (e.g., a Console Display and a Database Logger) attached to the same parser instance via parser.onFix().
+* **NCurses Integration:** Replaces scrolling console logs with a static, professional Terminal User Interface.  
+* **Real-Time Rendering:** Updates GPS coordinates, Speed, and Heading in-place.  
+* **Thread Isolation:** Manages console access carefully to prevent "garbled text" race conditions between logging threads and drawing threads.
 
-### **3\. Advanced Parsing Logic**
+### **3\. Data Persistence (SQLite)**
 
-* **Polymorphism:** The system identifies the NMEA Header (e.g., GPRMC) and spawns the correct derived class to handle the parsing strategy.  
-* **Coordinate Math:** Converts legacy NMEA DDMM.MMMM (Degrees-Minutes) into standard Decimal Degrees for modern GIS compatibility.  
-* **Safety:** Implements **XOR Checksum Validation** to reject corrupted packets before they enter the processing pipeline.
+* **Embedded Database:** Integrates libsqlite3 to persist GPS fixes to a local .db file using **Prepared Statements** for security and speed.
+
+### **4\. Hardware Integration (HAL)**
+
+* **Serial/UART:** Implements low-level POSIX termios configuration (4800 Baud, 8N1).  
+* **UDP Networking:** Listens on Port **10110** (Marine WiFi protocol).
 
 ## **Building and Running**
 
-The project utilizes a Makefile for streamlined compilation and build management.
-
 ### **Prerequisites**
 
-* A C++ compiler supporting C++17 (e.g., g++, clang).  
-* make utility.
+* C++17 Compiler (GCC/Clang)  
+* **SQLite3** (libsqlite3-dev / brew install sqlite3)  
+* **NCurses** (libncurses-dev / brew install ncurses)
 
-### **Build Instructions**
+### **Compilation**
 
-To compile the project and link all dependencies:  
-```bash
+The project uses a Makefile for streamlined compilation with \-pthread, \-lsqlite3, and \-lncurses support.  
 make
-```
-### **Running the Application**
 
-To run the executable immediately after building:  
-```bash
-make run
-```
-*Alternatively, you can run the binary directly:*  
+### **Running the System**
+
+The application runs in an infinite loop.  
 ```bash
 ./nmea\_engine
 ```
-### **Cleaning Up**
-
-To remove object files and the executable:  
-make clean
+*Note: The application will ask for configuration (UDP/Serial) in standard text mode before launching the TUI dashboard.*
 
 ## **Testing with Hardware Simulation**
 
@@ -102,37 +84,30 @@ Since physical GPS hardware is not always available, the system was verified usi
 To simulate a yacht broadcasting GPS data over WiFi:
 
 1. Start the application and select **Mode 1 (UDP)**.  
-2. Run netcat in a separate terminal to fire a packet: 
-```bash 
+2. Run netcat in a separate terminal to fire a packet:  
+```bash
    echo "\\$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,\*47" | nc \-u 127.0.0.1 10110
 ```
-### **Scenario B: Simulating Serial Hardware (UART)**
+   *Result: The TUI Dashboard updates instantly.*
 
-To simulate a physical serial cable using socat:
+### **Scenario B: Verifying Persistence**
 
-1. **Create Virtual Ports:**  
-```bash   
-   socat \-d \-d pty,raw,echo=0 pty,raw,echo=0
-```
-   *Note output paths: e.g., /dev/ttys005 (Receiver) and /dev/ttys006 (Transmitter).*  
-2. Start Application:  
-   Select Mode 2 (Serial) and enter the Receiver path (e.g., /dev/ttys005).  
-3. Inject Data:  
-   Write directly to the Transmitter port:  
-```bash   
-   echo "\\$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W\*6A" \> /dev/ttys006
+1. Run the application and inject data.  
+2. Inspect the generated voyage\_data.db file:  
+```bash
+   sqlite3 voyage\_data.db "SELECT \* FROM tracklog;"
 ```
 ## **Project Timeline (SDLC Simulation)**
 
 This project was developed following a strict Agile workflow with atomic commits:
 
-* **Phase 1:** Interface Design & Type Definitions (GPSData struct).  
-* **Phase 2:** Tooling Implementation (Hex conversion, String tokenization).  
-* **Phase 3:** Checksum Validation Logic (Security/Integrity).  
-* **Phase 4:** Core Parsing Logic (GPGGA implementation).  
-* **Phase 5:** Driver Implementation (Main Loop).  
-* **Phase 6:** **Architectural Refactoring** \-\> Migrated to Factory Pattern & Polymorphism.  
-* **Phase 7:** **System Integration** \-\> Implemented Serial and UDP data sources.  
-* **Phase 8:** **Event-Driven Architecture** \-\> Implemented Observer Pattern for decoupled subscriptions.
+* **Phase 1-4:** Core Logic (Types, Tooling, Checksum, Parsing).  
+* **Phase 5:** Driver Implementation.  
+* **Phase 6:** **Architectural Refactoring** \-\> Migrated to Factory Pattern.  
+* **Phase 7:** **System Integration** \-\> Implemented Serial and UDP HAL.  
+* **Phase 8:** **Event-Driven Architecture** \-\> Implemented Observer Pattern.  
+* **Phase 10:** **Concurrency** \-\> Implemented Thread-Safe Producer-Consumer Queue.  
+* **Phase 11:** **Persistence** \-\> Implemented SQLite Logger.  
+* **Phase 12:** **User Interface** \-\> Implemented NCurses TUI Dashboard.
 
 Author: Umar Arshid
