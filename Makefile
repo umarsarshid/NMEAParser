@@ -3,7 +3,7 @@ CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -O2
 
 # Add Linker Flags (Linux needs -pthread and -lsqlite3)
-LDFLAGS = -pthread -lsqlite3
+LDFLAGS = -pthread -lsqlite3 -lncurses
 
 # Project Name
 TARGET = nmea_engine
