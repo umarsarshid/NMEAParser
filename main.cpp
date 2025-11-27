@@ -15,13 +15,13 @@ std::atomic<bool> running(true);
 // THREAD A: PRODUCER (Reads Hardware)
 // ---------------------------------------------------------
 void gpsReaderTask(INMEASource* source, SafeQueue<std::string>& queue) {
-    std::cout << "[THREAD-A] Reader started." << std::endl;
+    // std::cout << "[THREAD-A] Reader started." << std::endl;
     while (running) {
         // This blocks until data comes from UDP/Serial
         std::string line = source->readLine();
         
         if (!line.empty()) {
-            std::cout << "[RX] " << line << std::endl;
+            // std::cout << "[RX] " << line << std::endl;
             queue.push(line); // Hand off to queue
         }
     }
@@ -48,7 +48,7 @@ void dataProcessorTask(NMEAParser* parser, SafeQueue<std::string>& queue) {
         // 4. VISUAL PROOF
         // We can't easily check .size() on std::queue without adding a method,
         // but we can print that we just finished one.
-        std::cout << "   [Slow-Consumer] Processed 1 msg. (Simulated Lag)" << std::endl;
+        // std::cout << "   [Slow-Consumer] Processed 1 msg. (Simulated Lag)" << std::endl;
     }
 }
 
@@ -69,9 +69,6 @@ int main() {
     std::unique_ptr<INMEASource> source;
     SafeQueue<std::string> buffer;
 
-    //initialize ncurses for the dashboard
-    GPSDashboard dashboard;
-
     // 1. Setup Source (Hardcoded to UDP for brevity, or reuse your selection logic)
     std::cout << "Initializing System..." << std::endl;
     std::cout << "Select Source: [1] UDP Network  [2] Serial Port: ";
@@ -86,36 +83,32 @@ int main() {
         std::cin >> port;
         source = std::make_unique<SerialSource>(port);
     }
-    
-    if (!source->open()) return -1;
-    std::cout << "--- Waiting for Data (Ctrl+C to quit) ---" << std::endl;
-    // 2. Subscribe Systems (The Wiring)
-    // We attach two independent systems to the same parser
-    // Attach Observers (Display/Log)
 
+    if (!source->open()) return -1;
     // 1. Setup DB
     std::cout << "Initializing Database..." << std::endl;
     SQLiteLogger dbLogger("voyage_data.db");
 
-    // 2. Subscribe the DB to the Parser
-    // We use a Lambda to capture the dbLogger reference
-    parser.onFix([&dbLogger](const GPSData& d) {
-        // Optional: Filter. Only log valid fixes with > 3 satellites?
-        std::cout << "[UI] Fix: " << d.latitude << "," << d.longitude << std::endl; 
-        if (d.isValid) {
-            dbLogger.log(d);
-        }
+   // -----------------------------------------------------
+    // 2. UI PHASE (NCurses Mode Starts Here)
+    // -----------------------------------------------------
+    // The moment this object is created, the screen clears!
+    GPSDashboard dashboard;
+
+    // Attach Dashboard to Parser
+    parser.onFix([&dashboard](const GPSData& d) {
+        dashboard.update(d);
     });
 
-    // ... continue with starting threads ...
+    // Attach Database Logger (Silent background task)
+    parser.onFix([&dbLogger](const GPSData& d) {
+        if (d.isValid) dbLogger.log(d);
+    });
 
-    std::cout << "--- Starting Multi-Threaded Engine ---" << std::endl;
-
-    // Launch Threads
+    // 3. START ENGINE
     std::thread producer(gpsReaderTask, source.get(), std::ref(buffer));
     std::thread consumer(dataProcessorTask, &parser, std::ref(buffer));
 
-    // Wait for Threads (Ideally, handle a Ctrl+C signal to set running=false)
     producer.join();
     consumer.join();
 
