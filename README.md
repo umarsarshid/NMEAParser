@@ -17,7 +17,8 @@ The system is built on seven core architectural pillars:
 6. **The Black Box (Persistence):** An RAII-compliant SQLite wrapper that securely logs voyage data to disk.  
 7. **The Face (User Interface):** An NCurses-based dashboard that renders live data without console scrolling.
 
-```graph LR  
+```mermaid
+flowchart LR  
     subgraph "Thread A: Hardware (Producer)"  
     A\[UDP / Serial Port\] \--\>|Raw Bytes| B(INMEASource)  
     B \--\>|Push| C{SafeQueue\<T\>}  
