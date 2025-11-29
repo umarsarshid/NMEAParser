@@ -9,10 +9,14 @@ protected:
 
 // 1. Math Helper Tests
 TEST_F(ParserTest, ChecksumValidation) {
-    // Valid Checksum
-    EXPECT_TRUE(NMEAParser::validateChecksum("$GPGGA,123519,,,,,0,,,,,,*47"));
-    // Invalid Checksum
-    EXPECT_FALSE(NMEAParser::validateChecksum("$GPGGA,123519,,,,,0,,,,,,*00"));
+    // FIX: Use the full, original string where we KNOW *47 is the correct checksum
+    std::string valid = "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47";
+    
+    EXPECT_TRUE(NMEAParser::validateChecksum(valid));
+
+    // Invalid Checksum (Same string, wrong hex at the end)
+    std::string invalid = "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*00";
+    EXPECT_FALSE(NMEAParser::validateChecksum(invalid));
 }
 
 TEST_F(ParserTest, CoordinateConversion) {
