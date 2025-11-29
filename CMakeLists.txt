@@ -111,8 +111,13 @@ target_link_libraries(test_parsing PRIVATE nmea_core gtest_main)
 # Test Suite 2: Concurrency Logic
 add_executable(test_concurrency tests/test_queue.cpp)
 target_link_libraries(test_concurrency PRIVATE nmea_core gtest_main)
+# Test Suite 3: JSON Logic
+add_executable(test_json tests/test_json.cpp)
+# We need to link nlohmann_json here!
+target_link_libraries(test_json PRIVATE nmea_core gtest_main nlohmann_json::nlohmann_json)
 
 # Integrate with CTest
 include(GoogleTest)
 gtest_discover_tests(test_parsing)
 gtest_discover_tests(test_concurrency)
+gtest_discover_tests(test_json)
