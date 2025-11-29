@@ -3,8 +3,8 @@
 ## **Executive Summary**
 
 This project is a modular, fault-tolerant C++ library designed to ingest, validate, parse, persist, and visualize **NMEA-0183** marine navigation data.  
-It represents a complete Embedded Systems software stack. The system has evolved from a simple string parser into a robust **Real-Time Engine** capable of handling high-frequency data bursts (10Hz+) without packet loss. It features a **Hardware Abstraction Layer (HAL)**, a **Producer-Consumer Architecture** for concurrency, an embedded **SQLite Database** for tracking, and a professional **Text User Interface (TUI)** for real-time monitoring.
-
+It represents a complete Embedded Systems software stack. The system has evolved from a simple string parser into a robust **Real-Time Engine** capable of handling high-frequency data bursts (10Hz+) without packet loss. It features a **Hardware Abstraction Layer (HAL)**, a **Producer-Consumer Architecture** for concurrency, an embedded **SQLite Database** for tracking, and a professional **Text User Interface (TUI)**.  
+The project employs modern DevOps practices, including **CMake** for cross-platform builds, **GoogleTest** for unit testing, and **Docker** for reproducible deployments via multi-stage builds.
 ## **System Architecture**
 
 The system is built on seven core architectural pillars:
@@ -45,45 +45,62 @@ graph LR
 * **Producer-Consumer Model:** Implements a multi-threaded architecture where **Thread A** handles high-speed IO (Ingestion) and **Thread B** handles CPU-intensive Logic/IO (Processing).  
 * **Backpressure Management:** Verified via stress testing to handle **10Hz** input streams even when downstream consumers lag (simulated 2Hz throughput), ensuring **Zero Packet Loss**.
 
-### **2\. User Interface (TUI)**
+### **2\. DevOps & Infrastructure**
+
+* **Dockerized Deployment:** Utilizes a **Multi-Stage Dockerfile** based on Alpine Linux to compile the application and ship a lightweight (\<15MB) runtime container.  
+* **Modern Build System:** Migrated from Makefiles to **CMake** with FetchContent for automatic dependency management (GoogleTest).  
+* **Automated Testing:** Comprehensive **GoogleTest** suite covering Factory logic, Checksum validation, and Concurrency safety.
+
+### **3\. User Interface (TUI)**
 
 * **NCurses Integration:** Replaces scrolling console logs with a static, professional Terminal User Interface.  
-* **Real-Time Rendering:** Updates GPS coordinates, Speed, and Heading in-place.  
 * **Thread Isolation:** Manages console access carefully to prevent "garbled text" race conditions between logging threads and drawing threads.
 
-### **3\. Data Persistence (SQLite)**
+### **4\. Data Persistence (SQLite)**
 
-* **Embedded Database:** Integrates libsqlite3 to persist GPS fixes to a local .db file using **Prepared Statements** for security and speed.
+* **Embedded Database:** Integrates libsqlite3 using **Prepared Statements** for security and speed.
 
-### **4\. Hardware Integration (HAL)**
-
-* **Serial/UART:** Implements low-level POSIX termios configuration (4800 Baud, 8N1).  
-* **UDP Networking:** Listens on Port **10110** (Marine WiFi protocol).
-
-## **Building and Running**
+## **Getting Started**
 
 ### **Prerequisites**
 
-* C++17 Compiler (GCC/Clang)  
-* **SQLite3** (libsqlite3-dev / brew install sqlite3)  
-* **NCurses** (libncurses-dev / brew install ncurses)
+* C++17 Compiler  
+* CMake 3.14+  
+* Docker (Optional)
 
-### **Compilation**
+### **Option A: Native Build (CMake)**
 
-The project uses a Makefile for streamlined compilation with \-pthread, \-lsqlite3, and \-lncurses support.  
-make
-
-### **Running the System**
-
-The application runs in an infinite loop.  
+\# 1\. Generate Build Files  
 ```bash
-./nmea\_engine
+mkdir build && cd build  
+cmake ..
 ```
-*Note: The application will ask for configuration (UDP/Serial) in standard text mode before launching the TUI dashboard.*
+\# 2\. Compile  
+```bash
+make
+```
+\# 3\. Run the Application  
+```bash
+./nmea\_app
+```
+\# 4\. Run Unit Tests  
+```bash
+ctest \--output-on-failure
+```
+### **Option B: Docker Build (Containerized)**
 
-## **Testing with Hardware Simulation**
-
-Since physical GPS hardware is not always available, the system was verified using industry-standard simulation tools.
+Run the application in an isolated Alpine Linux environment without installing local libraries.  
+\# 1\. Build the Image  
+```bash
+docker build \-t nmea\_engine:v1.0 .
+```
+\# 2\. Run the Container  
+\# \-it: Interactive TTY (Needed for TUI)  
+\# \-v: Mount current directory to save DB file to host  
+```bash
+docker run \-it \-v $(pwd):/app nmea\_engine:v1.0
+```
+## **🛠️ Testing with Hardware Simulation**
 
 ### **Scenario A: Simulating Network Data (UDP)**
 
@@ -91,29 +108,32 @@ To simulate a yacht broadcasting GPS data over WiFi:
 
 1. Start the application and select **Mode 1 (UDP)**.  
 2. Run netcat in a separate terminal to fire a packet:  
-```bash
+   ```bash
    echo "\\$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,\*47" | nc \-u 127.0.0.1 10110
-```
-   *Result: The TUI Dashboard updates instantly.*
+    ```
+### **Scenario B: Stress Testing (Concurrency)**
 
-### **Scenario B: Verifying Persistence**
+To verify the Producer-Consumer queue prevents data loss during bursts:
 
-1. Run the application and inject data.  
-2. Inspect the generated voyage\_data.db file:  
+1. Modify main.cpp to sleep in the consumer thread.  
+2. Run the firehose script:  
 ```bash
-   sqlite3 voyage\_data.db "SELECT \* FROM tracklog;"
+while true; do echo "\\$GPGGA,..." | nc \-u \-w 0 127.0.0.1 10110; sleep 0.1; done
 ```
+3. **Result:** Input is ingested instantly (\[RX\]), while processing happens at its own pace, proving buffer efficacy.
+
 ## **Project Timeline (SDLC Simulation)**
 
 This project was developed following a strict Agile workflow with atomic commits:
 
-* **Phase 1-4:** Core Logic (Types, Tooling, Checksum, Parsing).  
-* **Phase 5:** Driver Implementation.  
+* **Phase 1-5:** Core Logic & Driver Implementation.  
 * **Phase 6:** **Architectural Refactoring** \-\> Migrated to Factory Pattern.  
-* **Phase 7:** **System Integration** \-\> Implemented Serial and UDP HAL.  
-* **Phase 8:** **Event-Driven Architecture** \-\> Implemented Observer Pattern.  
-* **Phase 10:** **Concurrency** \-\> Implemented Thread-Safe Producer-Consumer Queue.  
-* **Phase 11:** **Persistence** \-\> Implemented SQLite Logger.  
-* **Phase 12:** **User Interface** \-\> Implemented NCurses TUI Dashboard.
+* **Phase 7:** **System Integration** \-\> Serial and UDP HAL.  
+* **Phase 8:** **Event-Driven Architecture** \-\> Observer Pattern.  
+* **Phase 10:** **Concurrency** \-\> Producer-Consumer Queue.  
+* **Phase 11:** **Persistence** \-\> SQLite Integration.  
+* **Phase 12:** **User Interface** \-\> NCurses Dashboard.  
+* **Phase 13:** **Modernization** \-\> Migration to CMake & GoogleTest.  
+* **Phase 14:** **DevOps** \-\> Docker Containerization.
 
 Author: Umar Arshid
