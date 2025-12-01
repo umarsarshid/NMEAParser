@@ -33,6 +33,7 @@ add_library(nmea_core
     NMEAParser.cpp
     GPSDashboard.cpp
     SQLiteLogger.cpp
+    WebServer.cpp
 )
 
 # Link external libs to the core
@@ -41,6 +42,7 @@ target_link_libraries(nmea_core PRIVATE
     SQLite::SQLite3 
     ${CURSES_LIBRARIES} 
     Threads::Threads
+    PUBLIC
     nlohmann_json::nlohmann_json  # <--- Added
     Crow::Crow                    # <--- Added
 )
@@ -115,6 +117,9 @@ target_link_libraries(test_concurrency PRIVATE nmea_core gtest_main)
 add_executable(test_json tests/test_json.cpp)
 # We need to link nlohmann_json here!
 target_link_libraries(test_json PRIVATE nmea_core gtest_main nlohmann_json::nlohmann_json)
+
+add_executable(test_web tests/test_server_manual.cpp)
+target_link_libraries(test_web PRIVATE nmea_core)
 
 # Integrate with CTest
 include(GoogleTest)
