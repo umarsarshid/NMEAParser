@@ -1,37 +1,74 @@
 #include "WebServer.h"
-#include <algorithm> // Required for std::remove
+#include <algorithm>
+#include <fstream>  // <--- NEW
+#include <sstream>  // <--- NEW
+
+// Helper to read file content from disk
+std::string readFile(const std::string& path) {
+    std::ifstream in(path, std::ios::in | std::ios::binary);
+    if (in) {
+        std::ostringstream contents;
+        contents << in.rdbuf();
+        in.close();
+        return contents.str();
+    }
+    return "";
+}
 
 WebServer::WebServer() {
-    // 1. Static Asset Route (The Frontend)
-    // Eventually, this will serve the React App
-    CROW_ROUTE(app, "/")([](){
-        return "<h1>NMEA Engine Online</h1><p>WebSocket endpoint at /ws</p>";
+    // 1. Root Route: Serve the React "index.html"
+    // Note: We assume the "dist" folder is next to the executable
+    CROW_ROUTE(app, "/")([](const crow::request&, crow::response& res){
+        std::string content = readFile("../frontend/dist/index.html");
+        if (content.empty()) {
+            res.code = 404;
+            res.write("Error: frontend/dist/index.html not found. Did you run 'npm run build'?");
+        } else {
+            res.set_header("Content-Type", "text/html");
+            res.write(content);
+        }
+        res.end();
     });
 
-    // 2. WebSocket Route (The Real-Time Stream)
+    // 2. Assets Route: Serve JS/CSS files
+    // Catch-all for anything inside /assets/
+    CROW_ROUTE(app, "/assets/<string>")([](const crow::request&, crow::response& res, std::string filename){
+        std::string path = "../frontend/dist/assets/" + filename;
+        std::string content = readFile(path);
+        
+        if (content.empty()) {
+            res.code = 404;
+            res.write("Not Found");
+        } else {
+            // Simple MIME Type detection
+            if (filename.find(".js") != std::string::npos) {
+                res.set_header("Content-Type", "application/javascript");
+            } else if (filename.find(".css") != std::string::npos) {
+                res.set_header("Content-Type", "text/css");
+            }
+            res.write(content);
+        }
+        res.end();
+    });
+
+    // 3. WebSocket Route (Unchanged)
     CROW_WEBSOCKET_ROUTE(app, "/ws")
         .onopen([this](crow::websocket::connection& conn) {
             std::lock_guard<std::mutex> lock(mtx);
             connections.push_back(&conn);
-            std::cout << "[Web] Client Connected! Total: " << connections.size() << std::endl;
         })
         .onclose([this](crow::websocket::connection& conn, std::string reason) {
             std::lock_guard<std::mutex> lock(mtx);
-            // Fancy STL way to remove an item from a vector by value
             connections.erase(
                 std::remove(connections.begin(), connections.end(), &conn), 
                 connections.end()
             );
-            std::cout << "[Web] Client Disconnected. Total: " << connections.size() << std::endl;
         })
         .onmessage([](crow::websocket::connection&, std::string data, bool is_binary) {
-            // We generally ignore incoming data for a dashboard, 
-            // but you could add control logic here (e.g., "Reset Trip")
-            (void)data;      // Silence unused variable warning
-            (void)is_binary; // Silence unused variable warning
+            // Ignore input
+            (void)data; (void)is_binary;
         });
 }
-
 void WebServer::run() {
     std::cout << "[Web] Starting Server on Port 8080..." << std::endl;
     // Set log level to Warning to stop Crow from spamming the console
