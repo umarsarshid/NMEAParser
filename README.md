@@ -16,16 +16,16 @@ This engine decouples high-speed hardware ingestion from downstream logic using 
 ## **Architecture**
 ```mermaid
 graph LR  
-    Hardware\[Serial / UDP\] \--\>|Ingest| Engine(C++ Core)  
+    Hardware [Serial  UDP] -->|Ingest| Engine(C++ Core)  
         
     subgraph Engine  
-    Producer\[Reader Thread\] \--\>|SafeQueue| Consumer\[Parser Thread\]  
-    Consumer \--\>|Event Bus| Database\[(SQLite)\]  
-    Consumer \--\>|Event Bus| TUI\[NCurses Terminal\]  
-    Consumer \--\>|Event Bus| Web\[Crow WebSocket\]  
+    Producer [Reader Thread] -->|SafeQueue| Consumer[Parser Thread]  
+    Consumer -->|Event Bus| Database[(SQLite)]  
+    Consumer -->|Event Bus| TUI[NCurses Terminal]  
+    Consumer -->|Event Bus| Web[Crow WebSocket]  
     end  
         
-    Web \--\>|JSON| Browser\[React Frontend\]
+    Web -->|JSON| Browser[React Frontend]
 ```
 ## **Quick Start**
 
