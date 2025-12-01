@@ -1,77 +1,71 @@
-# **Engineering Log: NMEA Navigation System**
+# **The Voyage: Engineering the NMEA Navigation Engine**
 
-**Summary:** Evolution of a C++17 embedded system from a string parser to a multi-threaded, hardware-integrated navigation engine.
+**Dev Log:** A retrospective on scaling a C++ prototype into a distributed IoT system.
 
-## **Phase 1: Core Parsing Logic**
+## **Milestone 1: The Core Engine (Phases 1-4)**
 
-**Objective:** Parse legacy NMEA-0183 ($GPGGA) data streams.
+**The Goal:** Parse raw GPS data from a serial stream.  
+I started this project treating it like a LeetCode problem: string manipulation. I just needed to verify the checksum and extract the latitude/longitude from a $GPGGA string.  
+The Reality Check:  
+Marine hardware is messy. The NMEA-0183 standard uses a weird DDMM.MMMM coordinate format that doesn't map directly to double.
 
-* **Problem:** NMEA standards use non-standard coordinate formats (DDMM.MMMM) and require checksum validation to prevent processing corrupted serial data.  
-* **Implementation:** \* Implemented custom math logic to convert Degrees-Minutes to Decimal Degrees.  
-  * Wrote an XOR checksum validator to verify data integrity before parsing.  
-* **Outcome:** Robust ingestion of raw ASCII streams.
+* **Tech:** std::string\_view (for read-only parsing), XOR Checksumming, Hex-to-Int conversion.  
+* **The Pivot:** I realized writing a monolithic parse() function was a trap. As soon as I wanted to support $GPRMC (Speed & Course), my if/else chains got ugly. I refactored early to the **Factory Pattern**, creating a polymorphic INMEASentence interface. Now, adding a new sentence type is just adding a file, not hacking the core.
 
-// Coordinate Conversion Logic  
-double convert(string val) {  
-    // 4807.038 \-\> 48 \+ (07.038 / 60\) \-\> 48.1173  
-}
+## **Milestone 2: Connecting to the Metal (Phases 5-7)**
 
-## **Phase 2: Architectural Refactoring (Factory Pattern)**
+**The Goal:** Make it talk to real hardware, not just hardcoded strings.  
+A parser is useless if it can't read from a port. I needed to support both physical GPS pucks (UART) and modern yacht simulators (UDP).
 
-**Objective:** Support multiple sentence types ($GPRMC, $GPZDA) without modifying core logic.
+* **The Solution:** Dependency Injection. I built a **Hardware Abstraction Layer (HAL)** defined by an INMEASource interface.  
+* **The Hardware:** I dug into low-level Linux syscalls (termios) to configure serial ports to the maritime standard: **4800 Baud, 8 Data bits, No Parity (8N1)**.  
+* **The Network:** I implemented POSIX sockets to listen on UDP Port 10110\. Using socat to create virtual serial ports on my Mac was a huge "aha\!" moment for testing without buying hardware.
 
-* **Problem:** The initial monolithic parse() function used a massive if/else chain, violating the Open/Closed Principle. Adding a new sentence type required modifying tested code.  
-* **Implementation:** \* Defined an abstract base class INMEASentence.  
-  * Implemented the **Factory Pattern** to dispatch logic based on the NMEA header string.  
-* **Outcome:** New sentence types can be added as isolated classes without touching the main parser.
+## **Milestone 3: The Architecture Shift (Phases 8-10)**
 
-## **Phase 3: Hardware Abstraction Layer (HAL)**
+**The Goal:** Handle high-speed data bursts without choking.  
+This was the most critical engineering phase. My simple loop Read \-\> Parse \-\> Print was blocking. If I tried to log data to a slow database, I missed incoming GPS packets.
 
-**Objective:** Decouple parsing logic from the physical data source.
+* **The Fix:** I moved to an **Event-Driven Architecture**.  
+  1. **Observer Pattern:** I turned the parser into an Event Emitter. The display and logger just subscribe via callbacks (parser.onFix(...)).  
+  2. **Concurrency:** I implemented a **Producer-Consumer** model.  
+     * **Thread A (Producer):** Polls hardware at 10Hz. Pushes raw bytes to a thread-safe queue.  
+     * **Thread B (Consumer):** Wakes up via std::condition\_variable only when data exists.  
+* **The Result:** I stress-tested this with a 500ms artificial delay in the consumer. The queue acted as a shock absorber, resulting in **Zero Packet Loss** at the network layer.
 
-* **Problem:** The system needed to support both physical GPS hardware (Serial/UART) and simulation data (UDP Network), but hardcoding these sources created tight coupling.  
-* **Implementation:** \* Created INMEASource interface using **Dependency Injection**.  
-  * **Serial:** Implemented termios configuration for 4800 Baud 8N1 (standard marine hardware).  
-  * **Network:** Implemented POSIX Sockets for UDP listening on port 10110\.  
-* **Outcome:** Seamless switching between hardware and network sources via configuration.
+## **Milestone 4: Persistence & Usability (Phases 11-12)**
 
-## **Phase 4: Event-Driven Architecture (Observer Pattern)**
+**The Goal:** Stop losing data when the app closes and make it readable.  
+Printing scrolling text to stdout is terrible UX for a captain. I needed a dashboard and a "Black Box" recorder.
 
-**Objective:** Distribute GPS data to multiple consumers (UI, Database) simultaneously.
+* **Persistence:** I integrated **SQLite** (the embedded standard). I wrote an RAII wrapper class to manage the C-style pointers and handles, ensuring the DB connection closes cleanly even if the app crashes. Using **Prepared Statements** was non-negotiable for performance and safety.  
+* **TUI Dashboard:** I used **NCurses** to take over the terminal window. This required careful thread hygiene—I had to silence all my background debug logging to prevent the UI from glitching out.
 
-* **Problem:** The main loop was tightly coupled to std::cout, making it impossible to add a database logger or GUI without cluttering the driver loop.  
-* **Implementation:** \* Refactored the Parser into an **Event Emitter**.  
-  * Utilized std::function callbacks to allow external systems to subscribe to onFix events.  
-* **Outcome:** Zero coupling between the Driver and the Display/Logger systems.
+## **Milestone 5: Professional Standards (Phases 13-14)**
 
-## **Phase 5: Concurrency (Producer-Consumer)**
+**The Goal:** "It works on my machine" wasn't good enough.  
+I wanted this code to be deployable.
 
-**Objective:** Prevent packet loss during high-frequency data bursts (10Hz).
+* **Build System:** I ditched Makefiles for **CMake**. I used FetchContent to manage dependencies (GoogleTest, Crow, JSON) so users don't have to manually install libraries.  
+* **DevOps:** I containerized the whole stack. I wrote a **Multi-Stage Dockerfile** using Alpine Linux.  
+  * *Stage 1:* Heavy build image (GCC, CMake).  
+  * *Stage 2:* Tiny runtime image (\<15MB) containing just the binary and libs.
 
-* **Problem:** Slow downstream processing (e.g., database writes taking 500ms) blocked the input reader, causing the OS to drop incoming UDP packets.  
-* **Implementation:** \* **Producer Thread:** Dedicated high-priority thread for non-blocking I/O.  
-  * **Consumer Thread:** Dedicated thread for logic and persistence.  
-  * **SafeQueue:** Implemented a thread-safe queue using std::mutex and std::condition\_variable to handle backpressure.  
-* **Outcome:** Verified zero packet loss at 10Hz input rates, even with simulated 2Hz consumer latency.
+## **Milestone 6: The IoT Pivot (Phases 15-20)**
 
-## **Phase 6: Persistence & Visualization**
+**The Goal:** Bridge the gap between C++ and the Modern Web.  
+The TUI is cool, but real IoT devices need web interfaces. I wanted a live map running in a browser, served directly from the C++ binary.
 
-**Objective:** Persist track history and improve operator UX.
+* **The Backend:** I integrated **Crow** (a C++ microframework). I set up a WebSocket server on a separate thread to broadcast JSON telemetry.  
+* **The Logic:** I serialized my C++ structs into JSON using nlohmann/json.  
+* **The Frontend:** I switched context to TypeScript/React. I built a **Vite** app using **Leaflet.js** for mapping.  
+* **The Integration:** This was the "Full Stack" moment. I configured the C++ server to host the compiled React static assets (.html, .js, .css).
 
-* **Persistence:** Integrated **SQLite** using RAII wrappers and Prepared Statements to securely log voyage data (voyage\_data.db).  
-* **Visualization:** Replaced scrolling console logs with a static **NCurses TUI** dashboard, implementing strict thread isolation to prevent rendering artifacts.
+Final State:  
+A single executable that:
 
-## **Phase 7: Infrastructure & DevOps**
-
-**Objective:** Ensure reproducibility and code quality.
-
-* **Build System:** Migrated from Makefiles to **CMake** for cross-platform dependency management (FetchContent).  
-* **Testing:** Replaced manual scripts with **GoogleTest**, covering Factory logic, Checksum validation, and Concurrency safety.  
-* **Containerization:** Implemented a **Multi-Stage Dockerfile** (Alpine Linux), reducing the deployment artifact from \>500MB to \<15MB.
-
-## **Technical Stack Summary**
-
-* **Language:** C++17  
-* **Patterns:** Factory, Observer, Producer-Consumer, RAII, Dependency Injection.  
-* **Libs:** SQLite3, NCurses, GoogleTest, POSIX Threads.  
-* **Tools:** CMake, Docker, Git.
+1. Reads 4800 baud Serial data.  
+2. Parses it on a background thread.  
+3. Logs it to SQLite.  
+4. Displays it on a Terminal UI.  
+5. **AND** serves a React Dashboard over HTTP/WebSockets.

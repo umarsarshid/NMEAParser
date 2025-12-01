@@ -30,7 +30,7 @@ WebServer::WebServer() {
         res.end();
     });
 
-    // 2. Assets Route: Serve JS/CSS files
+    // 2. Assets Route: Serve JS/CSS/IMG files
     // Catch-all for anything inside /assets/
     CROW_ROUTE(app, "/assets/<string>")([](const crow::request&, crow::response& res, std::string filename){
         std::string path = "../frontend/dist/assets/" + filename;
@@ -40,18 +40,24 @@ WebServer::WebServer() {
             res.code = 404;
             res.write("Not Found");
         } else {
-            // Simple MIME Type detection
+            // MIME Type detection
             if (filename.find(".js") != std::string::npos) {
                 res.set_header("Content-Type", "application/javascript");
             } else if (filename.find(".css") != std::string::npos) {
                 res.set_header("Content-Type", "text/css");
+            } else if (filename.find(".png") != std::string::npos) {
+                res.set_header("Content-Type", "image/png");
+            } else if (filename.find(".jpg") != std::string::npos || filename.find(".jpeg") != std::string::npos) {
+                res.set_header("Content-Type", "image/jpeg");
+            } else if (filename.find(".svg") != std::string::npos) {
+                res.set_header("Content-Type", "image/svg+xml");
             }
             res.write(content);
         }
         res.end();
     });
 
-    // 3. WebSocket Route (Unchanged)
+    // 3. WebSocket Route
     CROW_WEBSOCKET_ROUTE(app, "/ws")
         .onopen([this](crow::websocket::connection& conn) {
             std::lock_guard<std::mutex> lock(mtx);
