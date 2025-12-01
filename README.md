@@ -14,19 +14,19 @@ This engine decouples high-speed hardware ingestion from downstream logic using 
 * **Infrastructure:** Multi-stage **Docker** build (\<15MB image) and **GoogleTest** verification suites.
 
 ## **Architecture**
-
-graph LR  
-    Hardware\[Serial / UDP\] \--\>|Ingest| Engine(C++ Core)  
-      
-    subgraph Engine  
-    Producer\[Reader Thread\] \--\>|SafeQueue| Consumer\[Parser Thread\]  
-    Consumer \--\>|Event Bus| Database\[(SQLite)\]  
-    Consumer \--\>|Event Bus| TUI\[NCurses Terminal\]  
-    Consumer \--\>|Event Bus| Web\[Crow WebSocket\]  
-    end  
-      
-    Web \--\>|JSON| Browser\[React Frontend\]
-
+```mermaid
+    graph LR  
+        Hardware\[Serial / UDP\] \--\>|Ingest| Engine(C++ Core)  
+        
+        subgraph Engine  
+        Producer\[Reader Thread\] \--\>|SafeQueue| Consumer\[Parser Thread\]  
+        Consumer \--\>|Event Bus| Database\[(SQLite)\]  
+        Consumer \--\>|Event Bus| TUI\[NCurses Terminal\]  
+        Consumer \--\>|Event Bus| Web\[Crow WebSocket\]  
+        end  
+        
+        Web \--\>|JSON| Browser\[React Frontend\]
+```
 ## **Quick Start**
 
 ### **Option A: Docker (Recommended)**
@@ -72,8 +72,13 @@ Upon startup, the engine requests a data source configuration:
 
 To test without physical hardware, use netcat to inject NMEA sentences:  
 \# Simulate a moving vessel via UDP  
+```bash
 while true; do echo "\\$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,\*47" | nc \-u \-w 0 127.0.0.1 10110; sleep 0.1; done
-
+```
+Or run 
+```bash
+./firehose.sh
+``` 
 ## **Engineering Documentation**
 
 This tool was built to demonstrate advanced systems engineering patterns including Factory factories, Observer event buses, and lock-free concurrency.
