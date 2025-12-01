@@ -38,7 +38,7 @@ docker build \-t nmea\_engine .
 ```
 \# Run (Map port 8080 for Web UI, Mount current dir for DB persistence)  
 ```bash
-docker run \-it \-p 8080:8080 \-v $(pwd):/app nmea\_engine
+docker run -it -p 8080:8080 -v $(pwd):/data nmea_final
 ```
 ### **Option B: Native Build (CMake)**
 
