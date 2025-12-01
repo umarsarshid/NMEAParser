@@ -1,12 +1,21 @@
 #include <iostream>
 #include <memory>
-#include <thread>  
-#include <atomic>  
+#include <thread>
+#include <atomic>
+
+// --- FIX: INCLUDE CROW HEADERS FIRST ---
+#include "JSONUtils.h"   // Includes nlohmann/json
+#include "WebServer.h"   // Includes Crow (defines OK enum)
+// ---------------------------------------
+
 #include "NMEAParser.h"
 #include "NMEASource.h"
-#include "SafeQueue.h" 
+#include "SafeQueue.h"
 #include "SQLiteLogger.h"
-#include "GPSDashboard.h"
+
+// --- LEGACY C LIBS LAST ---
+#include "GPSDashboard.h" // Includes ncurses.h (defines OK macro)
+// --------------------------
 
 // Global atomic flag to control thread shutdown
 std::atomic<bool> running(true);
@@ -88,7 +97,17 @@ int main() {
     // 1. Setup DB
     std::cout << "Initializing Database..." << std::endl;
     SQLiteLogger dbLogger("voyage_data.db");
-
+    // Web Server Setup
+    WebServer webServer;
+    // -----------------------------------------------------
+    // Wire Parser -> WebServer (Observer Pattern)
+    // When a fix arrives, convert to JSON and broadcast to all browsers
+    parser.onFix([&webServer](const GPSData& d) {
+        if (d.isValid) {
+            std::string json = GPSDataToJson(d);
+            webServer.broadcast(json);
+        }
+    });
    // -----------------------------------------------------
     // 2. UI PHASE (NCurses Mode Starts Here)
     // -----------------------------------------------------
@@ -108,9 +127,14 @@ int main() {
     // 3. START ENGINE
     std::thread producer(gpsReaderTask, source.get(), std::ref(buffer));
     std::thread consumer(dataProcessorTask, &parser, std::ref(buffer));
+    // LAUNCH WEB THREAD ---
+    std::thread webThread([&webServer](){
+        webServer.run();
+    });
 
     producer.join();
     consumer.join();
+    webThread.join();
 
     return 0;
 }
