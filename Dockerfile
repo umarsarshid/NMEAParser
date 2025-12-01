@@ -1,36 +1,41 @@
 # ----------------------------------------------------
-# STAGE 1: Build the Application
+# STAGE 1: Build the React Frontend (Node.js)
 # ----------------------------------------------------
-FROM alpine:latest AS builder
+FROM node:20-alpine AS node-builder
+WORKDIR /frontend_build
+COPY frontend/package*.json ./
+COPY frontend/ ./
+RUN npm ci && npm run build
 
-# Install Build Tools and Development Libraries
-# build-base: GCC/G++ and Make
-# cmake: Build system
-# sqlite-dev & ncurses-dev: Headers for compilation
-# linux-headers: Needed for some C++ standard features
-RUN apk add --no-cache build-base cmake sqlite-dev ncurses-dev linux-headers
-
-WORKDIR /app
+# ----------------------------------------------------
+# STAGE 2: Build the C++ Backend (GCC/CMake)
+# ----------------------------------------------------
+FROM alpine:latest AS cpp-builder
+RUN apk add --no-cache build-base cmake sqlite-dev ncurses-dev linux-headers git
+WORKDIR /cpp_build
 COPY . .
-
-# Compile
-RUN mkdir build && cd build && \
-    cmake .. && \
-    make
+RUN mkdir build && cd build && cmake .. && make
 
 # ----------------------------------------------------
-# STAGE 2: Run the Application (Minimalist)
+# STAGE 3: Final Runtime Image
 # ----------------------------------------------------
 FROM alpine:latest
 
-# Install Runtime Libraries only (No headers/compilers needed)
-# libstdc++: Standard C++ library
+# Runtime Libs
 RUN apk add --no-cache libstdc++ sqlite-libs ncurses-libs
 
-WORKDIR /app
+# 1. Setup Data Directory (This is where the DB will live)
+WORKDIR /data
 
-# Copy the binary from the "builder" stage
-COPY --from=builder /app/build/nmea_app .
+# 2. Copy Binary to global bin (Safe from volume mounts)
+COPY --from=cpp-builder /cpp_build/build/nmea_app /usr/local/bin/nmea_app
 
-# Command to run when container starts
-CMD ["./nmea_app"]
+# 3. Copy Frontend to root (Safe from volume mounts)
+# The app will look for "../frontend/dist" relative to /data
+# Parent of /data is /, so it looks in /frontend/dist. Perfect.
+COPY --from=node-builder /frontend_build/dist /frontend/dist
+
+EXPOSE 8080
+
+# Run the binary (It's in the PATH now)
+CMD ["nmea_app"]
