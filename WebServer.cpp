@@ -77,9 +77,16 @@ WebServer::WebServer() {
 }
 void WebServer::run() {
     std::cout << "[Web] Starting Server on Port 8080..." << std::endl;
-    // Set log level to Warning to stop Crow from spamming the console
     app.loglevel(crow::LogLevel::Warning);
-    app.port(8080).multithreaded().run();
+    
+    try {
+        // Try to start the server
+        app.port(8080).multithreaded().run();
+    } catch (const std::exception& e) {
+        // If port 8080 is busy, print error instead of crashing
+        std::cerr << "\n[Web Error] Failed to start server: " << e.what() << std::endl;
+        std::cerr << "Is port 8080 already in use?\n" << std::endl;
+    }
 }
 
 void WebServer::broadcast(const std::string& message) {

@@ -1,140 +1,145 @@
+#include <csignal>
 #include <iostream>
 #include <memory>
 #include <thread>
 #include <atomic>
 
-// --- FIX: INCLUDE CROW HEADERS FIRST ---
-#include "JSONUtils.h"   // Includes nlohmann/json
-#include "WebServer.h"   // Includes Crow (defines OK enum)
-// ---------------------------------------
-
+// --- INCLUDE ORDER MATTERS FOR MACROS ---
+#include "JSONUtils.h"
+#include "WebServer.h"
 #include "NMEAParser.h"
 #include "NMEASource.h"
 #include "SafeQueue.h"
 #include "SQLiteLogger.h"
+#include "GPSDashboard.h" // NCurses last to avoid "OK" conflict
 
-// --- LEGACY C LIBS LAST ---
-#include "GPSDashboard.h" // Includes ncurses.h (defines OK macro)
-// --------------------------
-
-// Global atomic flag to control thread shutdown
+// 1. Global handles for cleanup
 std::atomic<bool> running(true);
+std::unique_ptr<INMEASource> globalSource;
+SafeQueue<std::string> buffer;
 
-// ---------------------------------------------------------
-// THREAD A: PRODUCER (Reads Hardware)
-// ---------------------------------------------------------
+// 2. Minimalist Signal Handler
+// REMOVED: std::cout calls (Unsafe in TUI mode)
+void signalHandler(int signum) {
+    (void)signum; // Silence unused warning
+    running = false;
+    
+    // Wake up the Reader
+    if (globalSource) {
+        globalSource->close(); 
+    }
+    // Wake up the Consumer
+    buffer.shutdown();
+}
+
 void gpsReaderTask(INMEASource* source, SafeQueue<std::string>& queue) {
-    // std::cout << "[THREAD-A] Reader started." << std::endl;
+    // Producer is silent (no cout) to protect TUI
     while (running) {
-        // This blocks until data comes from UDP/Serial
         std::string line = source->readLine();
-        
         if (!line.empty()) {
-            // std::cout << "[RX] " << line << std::endl;
-            queue.push(line); // Hand off to queue
+            queue.push(line); 
         }
     }
 }
 
-// ---------------------------------------------------------
-// THREAD B: CONSUMER (Parses & Logs)
-// ---------------------------------------------------------
 void dataProcessorTask(NMEAParser* parser, SafeQueue<std::string>& queue) {
-    std::cout << "[THREAD-B] Processor started." << std::endl;
     std::string rawData;
-    
     while (running) {
-        // This blocks (sleeps) until the queue has data
-        queue.waitAndPop(rawData);
-
-        // Simulate a slow database write or heavy calculation
-        // 2. SIMULATE SLOW DATABASE
-        // We force this thread to sleep for 500ms (0.5 seconds).
-        // This is ETERNITY for a computer.
-        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
+        if (!queue.waitAndPop(rawData)) break; 
         parser->parse(rawData);
-        // 4. VISUAL PROOF
-        // We can't easily check .size() on std::queue without adding a method,
-        // but we can print that we just finished one.
-        // std::cout << "   [Slow-Consumer] Processed 1 msg. (Simulated Lag)" << std::endl;
     }
 }
 
-// System A: The "GUI" (Prints formatted data)
-void displaySystem(const GPSData& data) {
-    std::cout << "\n[DISPLAY] Fix Acquired!" << std::endl;
-    std::cout << "   Lat: " << data.latitude << " | Lon: " << data.longitude << std::endl;
-}
-
-// System B: The "Data Logger" (Simulates writing to a database)
-void loggingSystem(const GPSData& data) {
-    // In a real app, this might write to a CSV file or SQL DB
-    std::cout << "[LOG] Database updated: " << data.toString() << std::endl;
-}
-
 int main() {
+    // Register Signals
+    std::signal(SIGINT, signalHandler); 
+    std::signal(SIGTERM, signalHandler);
+
     NMEAParser parser;
     std::unique_ptr<INMEASource> source;
-    SafeQueue<std::string> buffer;
 
-    // 1. Setup Source (Hardcoded to UDP for brevity, or reuse your selection logic)
-    std::cout << "Initializing System..." << std::endl;
+    // -----------------------------------------------------
+    // CONFIGURATION PHASE (Standard Terminal)
+    // -----------------------------------------------------
+    std::cout << "=== NMEA ENGINE SETUP ===" << std::endl;
     std::cout << "Select Source: [1] UDP Network  [2] Serial Port: ";
     int choice;
-    std::cin >> choice;
+    if (!(std::cin >> choice)) return 0; // Handle bad input
 
     if (choice == 1) {
         source = std::make_unique<UDPSource>(10110);
     } else {
         std::string port;
-        std::cout << "Enter Serial Device (e.g., /dev/ttyUSB0 or /dev/pts/X): ";
+        std::cout << "Enter Serial Device (e.g., /dev/ttys005): ";
         std::cin >> port;
         source = std::make_unique<SerialSource>(port);
     }
 
-    if (!source->open()) return -1;
-    // 1. Setup DB
-    std::cout << "Initializing Database..." << std::endl;
+    globalSource = std::move(source);
+    if (!globalSource->open()) return -1;
+
     SQLiteLogger dbLogger("voyage_data.db");
-    // Web Server Setup
     WebServer webServer;
-    // -----------------------------------------------------
-    // Wire Parser -> WebServer (Observer Pattern)
-    // When a fix arrives, convert to JSON and broadcast to all browsers
+
+    // Wire up Observers
     parser.onFix([&webServer](const GPSData& d) {
-        if (d.isValid) {
-            std::string json = GPSDataToJson(d);
-            webServer.broadcast(json);
-        }
+        if (d.isValid) webServer.broadcast(GPSDataToJson(d));
     });
-   // -----------------------------------------------------
-    // 2. UI PHASE (NCurses Mode Starts Here)
-    // -----------------------------------------------------
-    // The moment this object is created, the screen clears!
-    GPSDashboard dashboard;
-
-    // Attach Dashboard to Parser
-    parser.onFix([&dashboard](const GPSData& d) {
-        dashboard.update(d);
-    });
-
-    // Attach Database Logger (Silent background task)
+    
     parser.onFix([&dbLogger](const GPSData& d) {
         if (d.isValid) dbLogger.log(d);
     });
 
-    // 3. START ENGINE
-    std::thread producer(gpsReaderTask, source.get(), std::ref(buffer));
-    std::thread consumer(dataProcessorTask, &parser, std::ref(buffer));
-    // LAUNCH WEB THREAD ---
-    std::thread webThread([&webServer](){
-        webServer.run();
-    });
+    // -----------------------------------------------------
+    // RUNTIME PHASE (NCurses Scope)
+    // -----------------------------------------------------
+    // We wrap this in a block {} so destructors run BEFORE main exits
+    {
+        GPSDashboard dashboard; // Clears screen, enters TUI mode
+        
+        parser.onFix([&dashboard](const GPSData& d) {
+            dashboard.update(d);
+        });
 
-    producer.join();
-    consumer.join();
-    webThread.join();
+        // Launch Threads
+        std::thread producer(gpsReaderTask, globalSource.get(), std::ref(buffer));
+        std::thread consumer(dataProcessorTask, &parser, std::ref(buffer));
+        std::thread webThread([&webServer](){ webServer.run(); });
+
+        // Enable non-blocking input for the main loop
+        // This allows us to catch 'q' without blocking the UI
+        nodelay(stdscr, TRUE);
+
+        while(running) {
+            // Check for user quit 'q' or 'Q'
+            int ch = getch();
+            if (ch == 'q' || ch == 'Q') {
+                signalHandler(SIGINT); // Trigger shutdown manually
+            }
+            
+            // Check if Ncurses resized (Optional robustness)
+            if (ch == KEY_RESIZE) {
+                // handle resize if needed
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        // --- CLEANUP SEQUENCE ---
+        // We join threads HERE while TUI is still active (or just blank)
+        // so we don't print "Joined" on top of the dashboard.
+        
+        if (producer.joinable()) producer.join();
+        if (consumer.joinable()) consumer.join();
+        webThread.detach(); 
+
+    } // <--- DESTRUCTOR FIRES HERE. endwin() called. Terminal restored.
+
+    // -----------------------------------------------------
+    // EXIT PHASE (Back to Normal Terminal)
+    // -----------------------------------------------------
+    std::cout << "[System] Engine stopped safely." << std::endl;
+    std::cout << "[System] Database closed." << std::endl;
 
     return 0;
 }
