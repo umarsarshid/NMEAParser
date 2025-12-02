@@ -32,11 +32,12 @@ graph LR
 ### **Option A: Docker (Recommended)**
 
 Run the full stack (Engine \+ Web Server) in a lightweight Alpine container.  
-\# Build the image  
+# Build the image
 ```bash
-docker build \-t nmea\_engine .
+docker build -t nmea_final .
 ```
-\# Run (Map port 8080 for Web UI, Mount current dir for DB persistence)  
+# Run (Map port 8080 for Web UI, Mount current dir for DB persistence)
+# Note: We mount to /data to avoid overwriting the binary in /app
 ```bash
 docker run -it -p 8080:8080 -v $(pwd):/data nmea_final
 ```
@@ -67,7 +68,9 @@ Upon startup, the engine requests a data source configuration:
 2. **Interface Launch:**  
    * The terminal immediately switches to the **TUI Dashboard**.  
    * The Web Dashboard becomes available at http://localhost:8080.
-
+3. **Shutdown: **
+   * Press q to safely stop threads, close the database, and restore the terminal
+   
 ### **Simulation Tools**
 
 To test without physical hardware, use netcat to inject NMEA sentences:  
