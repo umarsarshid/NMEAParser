@@ -2,7 +2,7 @@
 #include <thread>
 #include <vector>
 #include <atomic>
-#include "../SafeQueue.h"
+#include "SafeQueue.h"
 
 TEST(ConcurrencyTest, QueueHandlesMultipleThreads) {
     SafeQueue<int> queue;

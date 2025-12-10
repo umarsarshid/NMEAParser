@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../JSONUtils.h"
+#include "JSONUtils.h"
 #include <iostream>
 
 TEST(JSONTest, SerializesCorrectly) {

@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../NMEAParser.h"
+#include "NMEAParser.h"
 
 // Fixture for setting up complex tests
 class ParserTest : public ::testing::Test {

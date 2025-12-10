@@ -30,12 +30,14 @@ find_package(SQLite3 REQUIRED)
 # 3. The Core Library (Logic Only)
 # We exclude main.cpp so we can link this into Tests independently
 add_library(nmea_core
-    NMEAParser.cpp
-    GPSDashboard.cpp
-    SQLiteLogger.cpp
-    WebServer.cpp
+    src/NMEAParser.cpp
+    src/GPSDashboard.cpp
+    src/SQLiteLogger.cpp
+    src/WebServer.cpp
 )
-
+target_include_directories(nmea_core PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 # Link external libs to the core
 # Update the linking for the Core Library
 target_link_libraries(nmea_core PRIVATE 
@@ -51,7 +53,7 @@ target_link_libraries(nmea_core PRIVATE
 target_include_directories(nmea_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # 4. The Application Executable
-add_executable(nmea_app main.cpp)
+add_executable(nmea_app src/main.cpp)
 target_link_libraries(nmea_app PRIVATE nmea_core)
 
 # 5. Testing Suite (GoogleTest)
