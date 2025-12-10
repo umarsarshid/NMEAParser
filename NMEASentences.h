@@ -17,7 +17,11 @@ public:
         if (tokens.size() > 5) data.longitude = NMEAParser::convertToDecimalDegrees(tokens[4], tokens[5]);
         if (tokens.size() > 6 && !tokens[6].empty()) data.fixQuality = std::stoi(tokens[6]);
         if (tokens.size() > 7 && !tokens[7].empty()) data.satellites = std::stoi(tokens[7]);
-        if (tokens.size() > 9 && !tokens[9].empty()) data.altitude = std::stod(tokens[9]);
+        if (tokens.size() > 9) {
+        try {
+            data.altitude = std::stod(std::string(tokens[9]));
+        } catch (...) { data.altitude = 0.0; }
+    }
     }
 };
 

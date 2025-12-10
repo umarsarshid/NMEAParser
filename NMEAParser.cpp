@@ -2,7 +2,7 @@
 #include "NMEASentences.h"
 #include <cmath> // Will be needed later for math
 #include <sstream> // For stringstream in split 
-
+#include <string>
 
 /* Logic:
 
@@ -28,6 +28,28 @@ void NMEAParser::notifyListeners(const GPSData& data) {
         listener(data); // Call each subscribed function
     }
 }
+
+// Internal helper: safely convert string to double
+double NMEAParser::safeStod(std::string_view str) {
+    if (str.empty()) return 0.0;
+    try {
+        // std::stod requires std::string, so we cast
+        return std::stod(std::string(str));
+    } catch (...) {
+        return 0.0; // Return 0.0 on error instead of crashing
+    }
+}
+
+// Internal helper: safely convert string to int
+int NMEAParser::safeStoi(std::string_view str) {
+    if (str.empty()) return 0;
+    try {
+        return std::stoi(std::string(str));
+    } catch (...) {
+        return 0; // Return 0 on error
+    }
+}
+
 
 // Main Parse Function
 GPSData NMEAParser::parse(const std::string& nmeastring) {
@@ -121,30 +143,24 @@ std::vector<std::string> NMEAParser::split(const std::string& s, char delimiter)
 }
 
 // Helper: Coordinate Converter
-double NMEAParser::convertToDecimalDegrees(const std::string& nmeaPos, const std::string& direction) {
+double NMEAParser::convertToDecimalDegrees(std::string_view nmeaPos, std::string_view direction) {
     if (nmeaPos.empty()) return 0.0;
 
-    // 1. Find where the decimal is (e.g., 4807.038 -> index 4)
     size_t decimalPos = nmeaPos.find('.');
-    
-    // Safety: If no decimal, handle gracefully (though NMEA usually has one)
-    if (decimalPos == std::string::npos || decimalPos < 2) return 0.0;
+    if (decimalPos == std::string_view::npos || decimalPos < 2) return 0.0;
 
-    // 2. Separate Degrees and Minutes
-    // Minutes start 2 digits before the decimal
+    // Separate Degrees and Minutes
     size_t minutesStart = decimalPos - 2;
-    
-    std::string degStr = nmeaPos.substr(0, minutesStart);
-    std::string minStr = nmeaPos.substr(minutesStart);
+    std::string_view degStr = nmeaPos.substr(0, minutesStart);
+    std::string_view minStr = nmeaPos.substr(minutesStart);
 
-    // 3. Convert to numbers
-    double degrees = std::stod(degStr);
-    double minutes = std::stod(minStr);
+    // --- FIX: USE SAFE CONVERSION ---
+    double degrees = safeStod(degStr);
+    double minutes = safeStod(minStr);
+    // --------------------------------
 
-    // 4. Calculate Decimal Degrees
     double result = degrees + (minutes / 60.0);
 
-    // 5. Handle Direction (South and West are negative)
     if (direction == "S" || direction == "W") {
         result *= -1.0;
     }
@@ -163,8 +179,3 @@ int NMEAParser::hexToDecimal(const std::string& hex) {
         return 0;// Return 0 on error
     }
 }
-
-
-
-// Note: You would call notifyListeners(data) in parse() when a valid fix is obtained.
-// For example, after parsing and validating data, you might add:

@@ -56,11 +56,14 @@ public:
     // STATIC UTILITIES (Shared tools)
     //static because they don't depend on instance state
     // Verifies if the string is not corrupted
+    static double safeStod(std::string_view str);
+    static int safeStoi(std::string_view str);
     static bool validateChecksum(const std::string& s);
     // Splits the string by commas (like Python's split)
     static std::vector<std::string> split(const std::string& s, char delimiter);
     // Converts NMEA weird coordinates (DDMM.MMMM) to standard Decimal Degrees
-    static double convertToDecimalDegrees(const std::string& nmeaPos, const std::string& direction);
+    static double convertToDecimalDegrees(const std::string_view nmeaPos, const std::string_view direction);
     // Hex to Int converter for checksum validation
     static int hexToDecimal(const std::string& hex);
+
 };
