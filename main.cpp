@@ -13,10 +13,15 @@
 #include "SQLiteLogger.h"
 #include "GPSDashboard.h" // NCurses last to avoid "OK" conflict
 
+struct RawPacket {
+    std::string sourceID;
+    std::string nmeaString;
+};
+
 // 1. Global handles for cleanup
 std::atomic<bool> running(true);
 std::unique_ptr<INMEASource> globalSource;
-SafeQueue<std::string> buffer;
+SafeQueue<RawPacket> buffer;
 
 // 2. Minimalist Signal Handler
 // REMOVED: std::cout calls (Unsafe in TUI mode)
@@ -32,21 +37,27 @@ void signalHandler(int signum) {
     buffer.shutdown();
 }
 
-void gpsReaderTask(INMEASource* source, SafeQueue<std::string>& queue) {
+void gpsReaderTask(std::string id,INMEASource* source, SafeQueue<RawPacket>& queue) {
     // Producer is silent (no cout) to protect TUI
     while (running) {
         std::string line = source->readLine();
         if (!line.empty()) {
-            queue.push(line); 
+            // Wrap the data with the ID
+            queue.push({ id, line });
         }
     }
 }
 
-void dataProcessorTask(NMEAParser* parser, SafeQueue<std::string>& queue) {
-    std::string rawData;
+void dataProcessorTask(NMEAParser* parser, SafeQueue<RawPacket>& queue) {
+    RawPacket packet;
     while (running) {
-        if (!queue.waitAndPop(rawData)) break; 
-        parser->parse(rawData);
+        if (!queue.waitAndPop(packet)) break; 
+
+        GPSData data = parser->parse(packet.nmeaString);
+        data.ID = packet.sourceID;
+
+        // Trigger observers (DB, Web, TUI)
+        parser->notifyListeners(data);
     }
 }
 

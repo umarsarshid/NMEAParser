@@ -8,6 +8,9 @@
 // 1. Define the Data Object
 // This struct holds the final, clean data extracted from the messy string.
 struct GPSData {
+    std::string ID;   // Identifier for the data source
+    std::string type;
+
     double timestamp = 0.0;     // UTC Time
     double latitude = 0.0;      // Decimal Degrees (converted from NMEA format)
     double longitude = 0.0;     // Decimal Degrees (converted from NMEA format)
@@ -38,8 +41,7 @@ class NMEAParser {
     // List of subscribers
     std::vector<GPSCallback> listeners;
 
-    // Helper to notify them
-    void notifyListeners(const GPSData& data);
+    
 
 public:
     // Constructor
@@ -52,9 +54,12 @@ public:
     // NEW: Subscription Method
     // Users call this to say "Call me when you get a fix"
     void onFix(GPSCallback cb);
-
+    // Helper to notify them
+    void notifyListeners(const GPSData& data);
     // STATIC UTILITIES (Shared tools)
     //static because they don't depend on instance state
+
+
     // Verifies if the string is not corrupted
     static double safeStod(std::string_view str);
     static int safeStoi(std::string_view str);

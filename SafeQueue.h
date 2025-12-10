@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <atomic>
 
+
 template <typename T>
 class SafeQueue {
 private:
