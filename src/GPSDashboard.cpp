@@ -21,43 +21,45 @@ void GPSDashboard::drawStaticLayout() {
 
 void GPSDashboard::update(const GPSData& data) {
     // 1. Update the state
-    fleetState[data.ID] = data;
+    fleet[data.ID] = data;
 
     // 2. Redraw the table
-    redrawFleet();
+    redrawTable();
 }
 
-void GPSDashboard::redrawFleet() {
-    int row = 6; // Start below header
+void GPSDashboard::redrawTable() {
+    int startRow = 6;
+    int maxRows = 20; // Clear up to row 20 to prevent ghosting
 
-    for (const auto& [id, data] : fleetState) {
-        // Clear the row before printing
-        move(row, 2);
-        clrtoeol(); 
+    // 1. CLEAR PHASE: Scrub the table area
+    for (int i = startRow; i < maxRows; i++) {
+        move(i, 2);
+        clrtoeol(); // Clear line from cursor to end
         
-        // Print columns
-        // ID
+        // Re-draw right border if clrtoeol wiped it
+        // (Simple hack: just print a pipe at the far right or redraw box later)
+    }
+
+    // 2. DRAW PHASE: Print active ships
+    int row = startRow;
+    for (const auto& [id, ship] : fleet) {
         mvprintw(row, 2, "%-10s", id.c_str());
-        
-        // Lat
-        mvprintw(row, 15, "%9.5f %c", std::abs(data.latitude), (data.latitude >= 0 ? 'N' : 'S'));
-        
-        // Lon
-        mvprintw(row, 30, "%9.5f %c", std::abs(data.longitude), (data.longitude >= 0 ? 'E' : 'W'));
-        
-        // Speed
-        mvprintw(row, 45, "%5.1f kts", data.speed);
-
-        // Sats
-        mvprintw(row, 56, "%2d", data.satellites);
-
+        mvprintw(row, 15, "%9.5f %c", std::abs(ship.latitude), (ship.latitude >= 0 ? 'N' : 'S'));
+        mvprintw(row, 30, "%9.5f %c", std::abs(ship.longitude), (ship.longitude >= 0 ? 'E' : 'W'));
+        mvprintw(row, 45, "%5.1f kts", ship.speed);
+        mvprintw(row, 56, "%2d", ship.satellites);
         row++;
     }
     
-    // Draw Footer
-    box(stdscr, 0, 0); // Re-draw border in case we wiped it
-    mvprintw(row + 2, 2, "Status: MONITORING active on Ports 10110, 10111");
-    mvprintw(row + 3, 2, "Press 'q' or Ctrl+C to Shutdown");
+    // 3. FOOTER PHASE
+    // Draw footer at a fixed location or strictly relative to the last row
+    mvprintw(row + 1, 2, "-------------------------------------------------------------");
+    mvprintw(row + 2, 2, "Active Sources: %lu   ", fleet.size()); // Extra spaces to wipe old numbers
+    mvprintw(row + 3, 2, "Status: MONITORING active on Ports 10110, 10111");
+    mvprintw(row + 4, 2, "Press 'q' or Ctrl+C to Shutdown");
+
+    // Redraw the box border because clrtoeol likely ate the right side
+    box(stdscr, 0, 0); 
 
     refresh();
 }

@@ -7,7 +7,7 @@
 class GPSDashboard {
 private:
     // Store the latest state for every vessel ID
-    std::map<std::string, GPSData> fleetState;
+    std::map<std::string, GPSData> fleet;
 
 public:
     GPSDashboard() {
@@ -33,5 +33,5 @@ public:
 
 private:
     void drawStaticLayout();
-    void redrawFleet();
+    void redrawTable();
 };

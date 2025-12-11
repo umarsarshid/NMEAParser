@@ -76,7 +76,7 @@ WebServer::WebServer() {
         });
 }
 void WebServer::run() {
-    std::cout << "[Web] Starting Server on Port 8080..." << std::endl;
+    // std::cout << "[Web] Starting Server on Port 8080..." << std::endl;
     app.loglevel(crow::LogLevel::Warning);
     
     try {

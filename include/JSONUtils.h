@@ -8,11 +8,10 @@ using json = nlohmann::json;
 // Define the mapping between C++ Struct and JSON Object
 inline void to_json(json& j, const GPSData& data) {
     j = json{
-
         {"type", data.type},
         {"timestamp", data.timestamp}, // You might want to format this later
         {"isValid", data.isValid},
-        {"ID", data.ID},
+        {"id", data.ID},
         {"lat", data.latitude},
         {"lon", data.longitude},
         {"speed", data.speed},   // Knots

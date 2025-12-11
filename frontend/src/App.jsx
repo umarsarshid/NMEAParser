@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
-import 'leaflet/dist/leaflet.css' // <--- CRITICAL: Map looks broken without this
-import './App.css'
-
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css' // <--- MUST BE HERE
 import L from 'leaflet';
+import './App.css'; // <--- Ensure this is imported
 
-// Fix broken icons in Vite
+// --- Fix for missing Marker Icons in Vite ---
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
@@ -15,115 +14,84 @@ let DefaultIcon = L.icon({
     iconSize: [25, 41],
     iconAnchor: [12, 41]
 });
-
 L.Marker.prototype.options.icon = DefaultIcon;
-
-// Helper to auto-pan the map when GPS updates
-function RecenterMap({ lat, lon }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView([lat, lon]);
-  }, [lat, lon]);
-  return null;
-}
+// --------------------------------------------
 
 function App() {
-  // 1. Define State
-  const [gpsData, setGpsData] = useState({
-    lat: 48.1351, // Default (Munich)
-    lon: 11.5820,
-    speed: 0.0,
-    course: 0.0,
-    sats: 0,
-    isValid: false
-  });
-
-  const [connected, setConnected] = useState(false);
   const [fleet, setFleet] = useState({});
+  const [connected, setConnected] = useState(false);
 
-  // 2. WebSocket Hook
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8080/ws");
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    // Use window.location.hostname to work inside Docker/Localhost automatically
+    const ws = new WebSocket(`${protocol}//${window.location.hostname}:8080/ws`);
 
-    ws.onopen = () => {
-      console.log("Connected to C++ Backend");
-      setConnected(true);
-    };
+    ws.onopen = () => setConnected(true);
+    ws.onclose = () => setConnected(false);
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        // Only update if data is valid coordinates
-        if (data.lat && data.lon) {
-            //  Functional state update to merge new data
-          setFleet(prevFleet => ({
-            ...prevFleet,
-            [data.id]: data // Update or Add this vessel ID
+        
+        // Handle case sensitivity (C++ sometimes serializes as uppercase depending on the struct)
+        const id = data.id || data.ID || data.sourceID; 
+
+        if (id) {
+          // Normalize the data so the rest of the app uses lowercase 'id'
+          const normalizedData = { ...data, id: id };
+          
+          setFleet(prev => ({
+            ...prev,
+            [id]: normalizedData
           }));
+        } else {
+            console.warn("Received JSON without an ID:", data);
         }
-      } catch (e) {
-        console.error("JSON Parse Error", e);
-      }
+      } catch (e) { console.error(e); }
     };
-
-    ws.onclose = () => setConnected(false);
-
-    // Cleanup on unmount
     return () => ws.close();
   }, []);
 
+  const ships = Object.values(fleet);
+
   return (
     <div className="dashboard-container">
-      
-      {/* 3. The Heads Up Display (HUD) */}
+      {/* HUD */}
       <div className="hud-overlay">
-        <h3>NMEA ENGINE</h3>
-        <div className="hud-row">
-          <span className="hud-label">STATUS:</span>
-          <span className="hud-value" style={{color: connected ? '#0f0' : '#f00'}}>
-            {connected ? "ONLINE" : "DISCONNECTED"}
-          </span>
+        <h3>FLEET COMMAND</h3>
+        <div style={{borderBottom:'1px solid #444', paddingBottom:'5px', marginBottom:'10px'}}>
+          STATUS: <span style={{color: connected ? '#0f0' : '#f00'}}>{connected ? "ONLINE" : "OFFLINE"}</span>
         </div>
-        <div className="hud-row">
-          <span className="hud-label">LAT:</span>
-          <span className="hud-value">{gpsData.lat.toFixed(6)}</span>
-        </div>
-        <div className="hud-row">
-          <span className="hud-label">LON:</span>
-          <span className="hud-value">{gpsData.lon.toFixed(6)}</span>
-        </div>
-        <div className="hud-row">
-          <span className="hud-label">SPEED:</span>
-          <span className="hud-value">{gpsData.speed.toFixed(1)} kts</span>
-        </div>
-        <div className="hud-row">
-          <span className="hud-label">COURSE:</span>
-          <span className="hud-value">{gpsData.course.toFixed(1)}°</span>
-        </div>
+        
+        {ships.length === 0 && <div>Waiting for signals...</div>}
+
+        {ships.map(ship => (
+          <div key={ship.id} style={{marginBottom: '8px', borderBottom:'1px solid #333'}}>
+            <strong>{ship.id}</strong>
+            <div style={{display:'flex', justifyContent:'space-between'}}>
+              <span>Lat: {ship.lat.toFixed(4)}</span>
+              <span>Lon: {ship.lon.toFixed(4)}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* 4. The Map */}
+      {/* Map */}
       <MapContainer 
-        center={[gpsData.lat, gpsData.lon]} 
-        zoom={13} 
-        scrollWheelZoom={true} 
+        center={[0, 0]} // Default center (Middle of ocean)
+        zoom={2} 
         className="map-layer"
       >
-        <TileLayer
-          attribution='&copy; OpenStreetMap contributors'
+        <TileLayer 
+          attribution='&copy; OpenStreetMap'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {Object.values(fleet).map((ship) => (
-        <Marker 
-          key={ship.id} 
-          position={[ship.lat, ship.lon]}
-        >
-          <Popup>
-            <strong>{ship.id}</strong><br/>
-            Speed: {ship.speed} kts
-          </Popup>
-        </Marker>
-      ))}
+        
+        {ships.map(ship => (
+          <Marker key={ship.id} position={[ship.lat, ship.lon]}>
+            <Popup>{ship.id}<br/>{ship.speed} kts</Popup>
+          </Marker>
+        ))}
       </MapContainer>
     </div>
   )

@@ -2,7 +2,7 @@
 
 # Target: Localhost UDP Port 10110
 HOST="127.0.0.1"
-PORT="10110"
+PORT="10111"
 
 echo "Blasting NMEA data at $HOST:$PORT..."
 
