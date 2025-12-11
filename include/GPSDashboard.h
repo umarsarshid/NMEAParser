@@ -1,9 +1,14 @@
 #pragma once
 #include <ncurses.h>
 #include <string>
+#include <map>
 #include "NMEAParser.h"
 
 class GPSDashboard {
+private:
+    // Store the latest state for every vessel ID
+    std::map<std::string, GPSData> fleetState;
+
 public:
     GPSDashboard() {
         // 1. Initialize NCurses
@@ -12,7 +17,9 @@ public:
         noecho();             // Don't echo keypresses
         curs_set(0);          // Hide the blinking cursor
         
-        // 2. Draw static elements (Borders, Labels)
+        // Enable non-blocking input for the dashboard itself if needed
+        nodelay(stdscr, TRUE); 
+        
         drawStaticLayout();
     }
 
@@ -26,4 +33,5 @@ public:
 
 private:
     void drawStaticLayout();
+    void redrawFleet();
 };

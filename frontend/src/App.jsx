@@ -39,6 +39,7 @@ function App() {
   });
 
   const [connected, setConnected] = useState(false);
+  const [fleet, setFleet] = useState({});
 
   // 2. WebSocket Hook
   useEffect(() => {
@@ -54,7 +55,11 @@ function App() {
         const data = JSON.parse(event.data);
         // Only update if data is valid coordinates
         if (data.lat && data.lon) {
-          setGpsData(data);
+            //  Functional state update to merge new data
+          setFleet(prevFleet => ({
+            ...prevFleet,
+            [data.id]: data // Update or Add this vessel ID
+          }));
         }
       } catch (e) {
         console.error("JSON Parse Error", e);
@@ -108,15 +113,17 @@ function App() {
           attribution='&copy; OpenStreetMap contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <Marker position={[gpsData.lat, gpsData.lon]}>
+        {Object.values(fleet).map((ship) => (
+        <Marker 
+          key={ship.id} 
+          position={[ship.lat, ship.lon]}
+        >
           <Popup>
-            Current Position<br />
-            Speed: {gpsData.speed} kts
+            <strong>{ship.id}</strong><br/>
+            Speed: {ship.speed} kts
           </Popup>
         </Marker>
-        
-        {/* Auto-follow the boat */}
-        <RecenterMap lat={gpsData.lat} lon={gpsData.lon} />
+      ))}
       </MapContainer>
     </div>
   )

@@ -1,63 +1,63 @@
 #include "GPSDashboard.h"
+#include <cmath>
 
 void GPSDashboard::drawStaticLayout() {
-    // Draw a box around the screen
+    clear(); // Clear screen for fresh layout
     box(stdscr, 0, 0);
 
     // Title
-    mvprintw(1, 2, " NMEA NAVIGATION ENGINE v1.0 ");
-    mvprintw(2, 2, "=============================");
+    attron(A_BOLD);
+    mvprintw(1, 2, " FLEET COMMAND CENTER ");
+    attroff(A_BOLD);
+    mvprintw(2, 2, "======================");
 
-    // Labels
-    mvprintw(4, 2, "LATITUDE  :");
-    mvprintw(5, 2, "LONGITUDE :");
-    mvprintw(6, 2, "ALTITUDE  :");
-    
-    mvprintw(8, 2, "SPEED     :");
-    mvprintw(9, 2, "COURSE    :");
-    
-    mvprintw(11, 2, "SATELLITES:");
-    mvprintw(12, 2, "FIX STATUS:");
-
-    mvprintw(14, 2, "LAST UPD  :");
+    // Table Header
+    mvprintw(4, 2, "%-10s | %-12s | %-12s | %-8s | %-5s", 
+             "VESSEL ID", "LATITUDE", "LONGITUDE", "SPEED", "SATS");
+    mvprintw(5, 2, "-------------------------------------------------------------");
 
     refresh();
 }
 
 void GPSDashboard::update(const GPSData& data) {
-    // Update Values (Columns offset by 15 spaces)
-    
-    // Latitude
-    mvprintw(4, 15, "%10.6f %c", std::abs(data.latitude), (data.latitude >= 0 ? 'N' : 'S'));
-    
-    // Longitude
-    mvprintw(5, 15, "%10.6f %c", std::abs(data.longitude), (data.longitude >= 0 ? 'E' : 'W'));
-    
-    // Altitude
-    mvprintw(6, 15, "%6.1f m", data.altitude);
+    // 1. Update the state
+    fleetState[data.ID] = data;
 
-    // Speed (Only if GPRMC)
-    mvprintw(8, 15, "%5.1f kts", data.speed);
-    
-    // Course
-    mvprintw(9, 15, "%5.1f deg", data.course);
+    // 2. Redraw the table
+    redrawFleet();
+}
 
-    // Sats
-    mvprintw(11, 15, "%2d", data.satellites);
-    
-    // Fix Status
-    if (data.isValid) {
-        attron(A_BOLD); // Turn on Bold
-        mvprintw(12, 15, "  ACTIVE  ");
-        attroff(A_BOLD);
-    } else {
-        mvprintw(12, 15, " SEARCHING");
+void GPSDashboard::redrawFleet() {
+    int row = 6; // Start below header
+
+    for (const auto& [id, data] : fleetState) {
+        // Clear the row before printing
+        move(row, 2);
+        clrtoeol(); 
+        
+        // Print columns
+        // ID
+        mvprintw(row, 2, "%-10s", id.c_str());
+        
+        // Lat
+        mvprintw(row, 15, "%9.5f %c", std::abs(data.latitude), (data.latitude >= 0 ? 'N' : 'S'));
+        
+        // Lon
+        mvprintw(row, 30, "%9.5f %c", std::abs(data.longitude), (data.longitude >= 0 ? 'E' : 'W'));
+        
+        // Speed
+        mvprintw(row, 45, "%5.1f kts", data.speed);
+
+        // Sats
+        mvprintw(row, 56, "%2d", data.satellites);
+
+        row++;
     }
+    
+    // Draw Footer
+    box(stdscr, 0, 0); // Re-draw border in case we wiped it
+    mvprintw(row + 2, 2, "Status: MONITORING active on Ports 10110, 10111");
+    mvprintw(row + 3, 2, "Press 'q' or Ctrl+C to Shutdown");
 
-    // Timestamp
-    // (Assuming data.timestamp is raw NMEA time for now)
-    mvprintw(14, 15, "%f", data.timestamp);
-
-    // Push changes to screen
     refresh();
 }
